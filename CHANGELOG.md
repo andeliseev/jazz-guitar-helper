@@ -4,6 +4,8 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+## 0.2.0 (2026-11-17)
+
 - Scales: turn them on, and each fretboard shows a scale to improvise over its chord, around the chord's notes, with the other notes named as tensions (9, 11, 13, ♭9…). Choose another over the fretboard; ready-made progressions start with the usual one for each chord's place in the key.
 - Each chord has a length, from half a bar to four bars, at the end of its notes in the sidebar. In the ready-made ii–V–I and ii–V–i, the last chord lasts two bars.
 - Staff: the progression above the fretboards, a bar every four beats, with each chord's pinned voicing (with Voice leading, the whole path), its notes, or its scale.
