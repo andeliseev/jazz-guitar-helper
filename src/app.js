@@ -1,4 +1,4 @@
-// Jazz Guitar Drop Helper: the page. State, rendering, the mouse and keyboard, Settings.
+// Jazz Guitar Helper: the page. State, rendering, the mouse and keyboard, Settings.
 // Music theory is in theory.js, drawing the fretboards in fretboard.js. docs/ui.md describes it.
 
 import {
@@ -10,6 +10,7 @@ import {
   chordTones,
   fretText,
   inversionName,
+  notesOnNeck,
   parseChord,
   parseChords,
   presetChords,
@@ -23,14 +24,18 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // Chord colors .c0 to .c7 in styles.css, by the chord's place in the progression.
 const COLORS = 8;
 const FRET_CHOICES = [12, 15, 17, 20, 22, 24];
-// Pixels between strings: a board per chord, or one taller board for all of them, as tall as the
-// window allows between these.
-const STACKED_GAP = 20;
-const OVERLAY_GAP = [30, 40];
-const MAX_DOT_RADIUS = 11.5;
+// Pixels between strings, which is how tall the boards are. Each view keeps its own, set with
+// Height in the toolbar: a board per chord is shorter than the one board for all of them.
+const GAPS = { stacked: 20, overlay: 32 };
+const GAP_RANGE = [16, 44];
+const MAX_DOT_RADIUS = 14;
 const RULER_HEIGHT = 22;
 const SAVE_DELAY_MS = 300;
 const TOAST_MS = 6000;
+// Asking GitHub for a newer release: a little after launch, then this often while the app runs;
+// opening Settings always asks too.
+const FIRST_UPDATE_CHECK_MS = 10 * 1000;
+const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000;
 const CHORD_HELP = 'Try symbols like Dm7, G7, Cmaj7, Bø or E♭°7.';
 
 const tauri = window.__TAURI__;
@@ -65,18 +70,25 @@ const backend = tauri
       load: () => tauri.core.invoke('load_state'),
       saveUi: (ui) => tauri.core.invoke('save_ui', { ui }),
       setTheme: (theme) => tauri.core.invoke('set_theme', { theme }),
+      openLink: (url) => tauri.core.invoke('open_external', { url }),
+      checkUpdate: () => tauri.core.invoke('check_update'),
+      installUpdate: () => tauri.core.invoke('install_update'),
       version: () => tauri.app.getVersion(),
     }
   : {
       load: async () => ({ theme: readLocal('theme') || 'system', ui: JSON.parse(readLocal('ui') || 'null') }),
       saveUi: async (ui) => writeLocal('ui', JSON.stringify(ui)),
       setTheme: async (theme) => writeLocal('theme', theme),
+      openLink: async (url) => window.open(url, '_blank', 'noopener'),
+      // A page in a browser has nothing to update.
+      checkUpdate: async () => null,
+      installUpdate: async () => {},
       version: async () => 'in a browser',
     };
 
 function readLocal(key) {
   try {
-    return localStorage.getItem(`drop-helper.${key}`);
+    return localStorage.getItem(`jazz-guitar-helper.${key}`);
   } catch {
     return null;
   }
@@ -84,7 +96,7 @@ function readLocal(key) {
 
 function writeLocal(key, value) {
   try {
-    localStorage.setItem(`drop-helper.${key}`, value);
+    localStorage.setItem(`jazz-guitar-helper.${key}`, value);
   } catch {
     // Private windows may refuse; the page still works for this visit.
   }
@@ -103,7 +115,10 @@ function defaultUi() {
     inversions: [0, 1, 2, 3],
     labels: 'intervals',
     view: 'stacked',
+    heights: { ...GAPS },
     leading: false,
+    // Every note of each chord on the neck, besides its voicings.
+    allNotes: false,
     // The pinned voicing of each chord (chord id → voicing id), and the chord last clicked,
     // which voice leading starts from.
     pins: {},
@@ -147,7 +162,12 @@ function sanitize(saved) {
   }
   if (saved.labels === 'notes') ui.labels = 'notes';
   if (saved.view === 'overlay') ui.view = 'overlay';
+  for (const view of Object.keys(GAPS)) {
+    const gap = saved.heights?.[view];
+    if (Number.isInteger(gap) && gap >= GAP_RANGE[0] && gap <= GAP_RANGE[1]) ui.heights[view] = gap;
+  }
   ui.leading = !!saved.leading;
+  ui.allNotes = !!saved.allNotes;
   if (saved.pins && typeof saved.pins === 'object') {
     for (const [id, pin] of Object.entries(saved.pins)) if (typeof pin === 'string') ui.pins[id] = pin;
   }
@@ -174,8 +194,9 @@ const state = {
   // The boards' geometry, the boards' width it was made for, and the fret under the mouse.
   geo: null,
   boardsWidth: 0,
-  boardsHeight: 0,
   bandFret: -1,
+  // The newer version GitHub has, if any (checkForUpdate).
+  update: null,
   // The dot or line under the mouse: { keys, board, node }.
   hover: null,
 };
@@ -309,6 +330,8 @@ function renderToolbar() {
   for (const b of $$('#labels button')) b.setAttribute('aria-checked', String(b.dataset.labels === ui.labels));
   for (const b of $$('#view button')) b.setAttribute('aria-checked', String(b.dataset.view === ui.view));
   $('#leading').setAttribute('aria-pressed', String(ui.leading));
+  $('#all-notes').setAttribute('aria-pressed', String(ui.allNotes));
+  $('#height').value = ui.heights[ui.view];
 }
 
 function renderBoards() {
@@ -330,16 +353,12 @@ function renderBoards() {
   }
   const style = getComputedStyle(boards);
   state.boardsWidth = boards.clientWidth;
-  state.boardsHeight = boards.clientHeight;
   const width = Math.floor(boards.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
-  const overlay = ui.view === 'overlay';
-  // The board is 6.6 gaps tall; the fret numbers, legend and info line take about 110 px.
-  const fit = Math.floor((boards.clientHeight - 110) / 6.6);
-  const gap = overlay ? Math.max(OVERLAY_GAP[0], Math.min(OVERLAY_GAP[1], fit)) : STACKED_GAP;
-  const geo = geometry(width, ui.frets, { gap, leftHanded: ui.leftHanded });
+  // In Stacked each board has its own fret numbers, so a fret reads at any board without looking up.
+  const geo = geometry(width, ui.frets, { gap: ui.heights[ui.view], leftHanded: ui.leftHanded, numbers: ui.view === 'stacked' });
   state.geo = geo;
   const nodes = [ruler(geo)];
-  if (overlay) nodes.push(overlayView(geo));
+  if (ui.view === 'overlay') nodes.push(overlayView(geo));
   else for (const row of state.rows) nodes.push(stackedRow(row, geo));
   boards.replaceChildren(...nodes);
   restyle();
@@ -362,15 +381,17 @@ function ruler(geo) {
   return wrap;
 }
 
-/** What a board draws for a chord: its voicings, each note labeled as chosen. */
+/**
+ * What a board draws for a chord: its voicings, each note labeled as chosen, and with All notes on,
+ * every other place its tones are on the neck (`extras`).
+ */
 function layerOf(row) {
-  const names = state.ui.labels === 'notes';
+  const { ui } = state;
+  const note = (n) => ({ string: n.string, fret: n.fret, label: ui.labels === 'notes' ? n.tone.name : n.tone.label, root: n.tone.deg === 1 });
   return {
     cls: row.cls,
-    voicings: row.voicings.map((v) => ({
-      id: v.key,
-      notes: v.notes.map((n) => ({ string: n.string, fret: n.fret, label: names ? n.tone.name : n.tone.label, root: n.tone.deg === 1 })),
-    })),
+    voicings: row.voicings.map((v) => ({ id: v.key, notes: v.notes.map(note) })),
+    extras: ui.allNotes ? notesOnNeck(row.chord, { frets: ui.frets, openStrings: ui.openStrings }).map(note) : [],
   };
 }
 
@@ -656,6 +677,48 @@ function toggleLeading() {
 function openSettings() {
   renderSettings();
   $('#settings').hidden = false;
+  checkForUpdate();
+}
+
+// Updates (update.rs, docs/development.md#updates)
+
+/** Asks GitHub whether a newer release exists. Failures (offline, nothing released yet) stay quiet. */
+async function checkForUpdate() {
+  try {
+    state.update = await backend.checkUpdate();
+  } catch (e) {
+    console.warn(e);
+    return;
+  }
+  renderUpdate();
+}
+
+/** Update to X in Settings, and a dot on the Settings button while it waits there. */
+function renderUpdate() {
+  const button = $('#update');
+  button.hidden = !state.update;
+  if (state.update && !button.disabled) button.textContent = `Update to ${state.update}`;
+  $('#open-settings').classList.toggle('has-update', Boolean(state.update));
+  $('#open-settings').title = state.update ? `Version ${state.update} is available` : '';
+}
+
+/**
+ * Downloads and installs the update. On Windows the app closes and the installer opens it again
+ * when it's done; on macOS the app quits and opens again.
+ */
+async function installUpdate() {
+  const button = $('#update');
+  button.disabled = true;
+  button.textContent = 'Updating…';
+  try {
+    await backend.installUpdate();
+  } catch (e) {
+    toast(String(e));
+    button.disabled = false;
+    renderUpdate();
+    // Installing used up the update that was found; find it again.
+    checkForUpdate();
+  }
 }
 
 function closeSettings() {
@@ -879,6 +942,25 @@ function bindEvents() {
     render();
   });
   $('#leading').addEventListener('click', toggleLeading);
+  $('#all-notes').addEventListener('click', () => {
+    state.ui.allNotes = !state.ui.allNotes;
+    render();
+  });
+  // The boards follow the slider as it moves, at most once a frame; a double-click goes back to
+  // the view's default height.
+  const setHeight = (gap) => {
+    state.ui.heights[state.ui.view] = gap;
+    $('#height').value = gap;
+    if (!state.heightFrame) {
+      state.heightFrame = requestAnimationFrame(() => {
+        state.heightFrame = 0;
+        renderBoards();
+      });
+    }
+    scheduleSave();
+  };
+  $('#height').addEventListener('input', (e) => setHeight(Number(e.target.value)));
+  $('#height').addEventListener('dblclick', () => setHeight(GAPS[state.ui.view]));
 
   // Fretboards
   const boards = $('#boards');
@@ -905,6 +987,12 @@ function bindEvents() {
 
   // Settings
   $('#close-settings').addEventListener('click', closeSettings);
+  $('#about').addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-href]');
+    if (!link) return;
+    e.preventDefault();
+    backend.openLink(link.dataset.href).catch((error) => toast(String(error)));
+  });
   $('#settings').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeSettings();
   });
@@ -929,6 +1017,7 @@ function bindEvents() {
   });
 
   $('#toast-action').addEventListener('click', runToastAction);
+  $('#update').addEventListener('click', installUpdate);
 }
 
 function fillControls() {
@@ -975,13 +1064,13 @@ async function init() {
       $('#app-version').textContent = version;
     })
     .catch(() => {});
-  // A new width redraws the boards; a new height only the overlay, which fits the height.
+  setTimeout(checkForUpdate, FIRST_UPDATE_CHECK_MS);
+  setInterval(checkForUpdate, UPDATE_CHECK_MS);
+  // A new width redraws the boards; their height is the user's (Height).
   new ResizeObserver(() => {
     requestAnimationFrame(() => {
       const boards = $('#boards');
-      if (boards.hidden) return;
-      const resized = boards.clientWidth !== state.boardsWidth || (state.ui.view === 'overlay' && boards.clientHeight !== state.boardsHeight);
-      if (resized) renderBoards();
+      if (!boards.hidden && boards.clientWidth !== state.boardsWidth) renderBoards();
     });
   }).observe($('#boards'));
 }

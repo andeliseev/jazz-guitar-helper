@@ -29,6 +29,6 @@ for (const path of ['package.json', 'package-lock.json']) {
 edit('src-tauri/tauri.conf.json', (s) => s.replace(/("version":\s*")[^"]+"/, `$1${version}"`));
 edit('src-tauri/Cargo.toml', (s) => s.replace(/^(version\s*=\s*")[^"]+"/m, `$1${version}"`));
 edit('src-tauri/Cargo.lock', (s) =>
-  s.replace(/(\[\[package\]\]\r?\nname = "jazz-guitar-drop-helper"\r?\nversion = ")[^"]+"/, `$1${version}"`));
+  s.replace(/(\[\[package\]\]\r?\nname = "jazz-guitar-helper"\r?\nversion = ")[^"]+"/, `$1${version}"`));
 
 console.log(`Version set to ${version}`);

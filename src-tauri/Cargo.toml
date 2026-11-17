@@ -1,5 +1,5 @@
 [package]
-name = "jazz-guitar-drop-helper"
+name = "jazz-guitar-helper"
 version = "0.1.0"
 description = "Drop voicings on the guitar fretboard"
 license = "MIT"
@@ -13,6 +13,11 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Opens the links in Settings in the default browser, as in Unified Mail.
+open = "5"
+# Updates from GitHub Releases, set up as in Unified Mail. Its default features add rustls (a
+# second TLS stack next to the OS's) and zip (only for old zipped Windows updates).
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
 
 # Size-focused release build, as in Unified Mail: https://v2.tauri.app/concept/size/
 [profile.release]

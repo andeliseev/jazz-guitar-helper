@@ -1,9 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Jazz Guitar Drop Helper: the window and the saved state. Everything else, the music theory
+//! Jazz Guitar Helper: the window, the saved state and updates. Everything else, the music theory
 //! included, happens in the page (src/); see docs/architecture.md.
 
 mod settings;
+mod update;
 
 use settings::{Settings, Store, Theme};
 use tauri::{Manager, State, WebviewWindow};
@@ -30,8 +31,19 @@ fn set_theme(window: WebviewWindow, store: State<'_, Store>, theme: Theme) -> Re
     store.update(|s| s.theme = theme)
 }
 
+/// Opens a link from Settings (GitHub, the website) in the default browser. Only `https:`.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err(format!("Not opening this link: {url}"));
+    }
+    open::that_detached(&url).map_err(|e| format!("Couldn't open {url}: {e}"))
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(update::PendingUpdate::default())
         .setup(|app| {
             let store = Store::load(&app.path().app_data_dir()?);
             let theme = store.get().theme;
@@ -64,7 +76,14 @@ fn main() {
             window.build()?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![load_state, save_ui, set_theme])
+        .invoke_handler(tauri::generate_handler![
+            load_state,
+            save_ui,
+            set_theme,
+            open_external,
+            update::check_update,
+            update::install_update
+        ])
         .run(tauri::generate_context!())
-        .expect("error while running Jazz Guitar Drop Helper");
+        .expect("error while running Jazz Guitar Helper");
 }

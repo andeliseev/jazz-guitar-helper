@@ -156,6 +156,20 @@ export function voicings(chord, drop, set, { frets = 15, openStrings = true } = 
   return found.sort((a, b) => a.low - b.low || a.high - b.high);
 }
 
+/** Every place on the neck within `frets` frets where one of the chord's tones is, on every string. */
+export function notesOnNeck(chord, { frets = 15, openStrings = true } = {}) {
+  const tones = new Map(chordTones(chord).map((t) => [t.pc, t]));
+  const found = [];
+  for (let string = 1; string <= 6; string++) {
+    for (let fret = openStrings ? 0 : 1; fret <= frets; fret++) {
+      const pitch = TUNING[string] + fret;
+      const tone = tones.get(mod(pitch, 12));
+      if (tone) found.push({ string, fret, pitch, tone });
+    }
+  }
+  return found;
+}
+
 /** Frets from the low E string to the high one, "x" for strings not played: "x x 0 2 1 1". */
 export function fretText(voicing) {
   return [6, 5, 4, 3, 2, 1]

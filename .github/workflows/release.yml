@@ -1,6 +1,8 @@
 # One-click release: Actions → Release → Run workflow.
-# Builds the Windows and/or macOS installers and publishes them as a GitHub Release. Needs no
-# secrets: the app isn't code-signed yet and has no updater (docs/todo.md).
+# Builds the Windows and/or macOS installers and publishes them as a GitHub Release, with the
+# signed update files installed apps update from. Needs the updater's TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets, the same key as Unified Mail's
+# (see docs/development.md#updates). The app isn't code-signed yet.
 name: Release
 run-name: Release (${{ inputs.version || inputs.bump }}, ${{ inputs.platforms }})
 
@@ -38,6 +40,16 @@ jobs:
       release_id: ${{ steps.release.outputs.id }}
       matrix: ${{ steps.platforms.outputs.matrix }}
     steps:
+      - name: Check secrets
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          # Without the key a release would have no update files, and installed apps would never hear of it.
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Add the updater's TAURI_SIGNING_PRIVATE_KEY (and _PASSWORD) repository secrets first (see docs/development.md#updates)."
+            exit 1
+          fi
+
       - name: Choose platforms
         id: platforms
         env:
@@ -135,7 +147,7 @@ jobs:
               ...context.repo,
               tag_name: tag,
               target_commitish: sha,
-              name: `Jazz Guitar Drop Helper ${tag}`,
+              name: `Jazz Guitar Helper ${tag}`,
               body,
               draft: true,
             });
@@ -152,8 +164,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Every action is pinned to a commit, with its tag or branch in a comment, as in Unified Mail:
-      # a tag moved to other code mustn't change what runs here. To update one:
-      # gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
+      # this job holds the update-signing key, so a tag moved to other code mustn't change what runs
+      # here. To update one: gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
@@ -182,9 +194,19 @@ jobs:
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update files, which installed apps check against the public key in tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.prepare.outputs.release_id }}
-          args: ${{ matrix.args }}
+          # tauri.release.conf.json turns on the signed update files, only here, so local builds
+          # don't need the key. The action merges both jobs' entries into one latest.json.
+          args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
+          # The generic windows-x86_64 entry of latest.json is the NSIS installer, like the README's download.
+          updaterJsonPreferNsis: true
+          # The signatures are copied into latest.json, which is all the updater reads, so the
+          # separate .sig files would only clutter the downloads.
+          uploadUpdaterSignatures: false
 
   # Publish only when every installer built, so a release is never half-empty.
   publish:

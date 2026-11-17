@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jazz Guitar Drop Helper</title>
+  <title>Jazz Guitar Helper</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
       <div class="brand">
         <!-- The app icon (app-icon.svg). -->
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#dd6b10"/><g fill="none" stroke="#fff" stroke-linecap="round"><path d="M7.5 6.6h9" stroke-width="1.7"/><path d="M7.5 10.4h9M7.5 14.2h9M7.5 18h9M7.5 6.6v11.4M10.5 6.6v11.4M13.5 6.6v11.4M16.5 6.6v11.4" stroke-width="0.85"/></g><g fill="#fff"><circle cx="7.5" cy="8.5" r="1.5"/><circle cx="10.5" cy="16.1" r="1.5"/><circle cx="13.5" cy="12.3" r="1.5"/><circle cx="16.5" cy="16.1" r="1.5"/></g></svg>
-        <div class="brand-name"><small>Jazz Guitar</small>Drop Helper</div>
+        Jazz Guitar Helper
       </div>
 
       <div class="side-head">
@@ -80,6 +80,15 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="16" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="14" r="2.2"/><path d="M6.4 14.3l4.2-4.6M13.9 9.2l3.3 3.4"/></svg>
             Voice leading
           </button>
+          <button id="all-notes" class="chip toggle" aria-pressed="false"
+                  title="Every note of each chord on the whole neck, on all strings, besides its voicings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="1.2"/><circle cx="12" cy="6" r="1.2"/><circle cx="18" cy="6" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/><circle cx="6" cy="18" r="1.2"/><circle cx="12" cy="18" r="1.2"/><circle cx="18" cy="18" r="1.2"/></svg>
+            All notes
+          </button>
+          <label class="height-pick" title="How tall the fretboards are; Stacked and Overlay each keep their own. Double-click to reset.">
+            <span class="group-label">Height</span>
+            <input id="height" type="range" min="16" max="44" step="1" aria-label="Fretboard height">
+          </label>
         </div>
       </header>
 
@@ -132,8 +141,16 @@
         </label>
       </section>
 
+      <!-- The links open in the browser (open_external). -->
       <section id="about">
-        <p>Jazz Guitar Drop Helper <span id="app-version"></span></p>
+        <p>Jazz Guitar Helper <span id="app-version"></span> <button id="update" hidden></button></p>
+        <p>
+          <a href="#" data-href="https://github.com/andeliseev/jazz-guitar-helper">GitHub</a> ·
+          <a href="#" data-href="https://github.com/andeliseev/jazz-guitar-helper/releases">Releases</a> ·
+          <a href="#" data-href="https://andeliseev.github.io/jazz-guitar-helper/">Website</a> ·
+          <a href="#" data-href="https://andeliseev.github.io/jazz-guitar-helper/privacy.html">Privacy policy</a> ·
+          <a href="#" data-href="https://andeliseev.github.io/jazz-guitar-helper/support.html">Support</a>
+        </p>
         <p>© 2026 Andrei Eliseev</p>
       </section>
     </div>

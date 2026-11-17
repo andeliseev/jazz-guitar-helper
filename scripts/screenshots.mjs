@@ -53,7 +53,7 @@ async function waitFor(url) {
 }
 
 const server = spawn(process.execPath, ['scripts/serve.mjs', String(SERVE_PORT)], { stdio: 'ignore' });
-const profile = mkdtempSync(join(tmpdir(), 'drop-helper-shots-'));
+const profile = mkdtempSync(join(tmpdir(), 'jazz-guitar-helper-shots-'));
 const browser = spawn(browserPath, [
   '--headless=new',
   `--remote-debugging-port=${DEBUG_PORT}`,
@@ -91,7 +91,7 @@ try {
   await sleep(800);
   // The default state with the path pinned; app.js fills in the other chords' pins.
   await send('Runtime.evaluate', {
-    expression: `localStorage.clear(); localStorage.setItem('drop-helper.ui', ${JSON.stringify(JSON.stringify(STATE))});`,
+    expression: `localStorage.clear(); localStorage.setItem('jazz-guitar-helper.ui', ${JSON.stringify(JSON.stringify(STATE))});`,
   });
   mkdirSync('docs/images', { recursive: true });
   for (const theme of ['light', 'dark']) {

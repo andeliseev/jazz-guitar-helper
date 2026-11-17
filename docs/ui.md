@@ -15,10 +15,10 @@ Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTau
 `#app` is a two-column grid: a 264 px sidebar and the main pane. Its single row is `minmax(0, 1fr)` so the fretboards scroll inside the window.
 
 - **Sidebar:** the brand, **Progression** (a row per chord, then **Add chords**), **Quick add** (a key and the ready-made progressions), and Settings at the bottom. It scrolls when the progression is long.
-- **Toolbar:** two rows. The first chooses what's voiced: the drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, and Voice leading. When the pane is wide enough, the second row sits beside the first.
+- **Toolbar:** two rows. The first chooses what's voiced: the drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, and Height (a slider). When the pane is wide enough, the second row sits beside the first.
 - **Fretboards** (`#boards`): fret numbers on top, sticky while the boards scroll, then a board per chord (Stacked) or one board for all (Overlay). With no chord to show, an empty state says why, with a button that adds a ii–V–I.
 
-The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width; a new width redraws them, and in Overlay a new height too (`ResizeObserver`).
+The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width, and a new width redraws them (`ResizeObserver`). How tall they are is the user's choice (see [Height](#height)).
 
 ### Title bar
 
@@ -46,16 +46,21 @@ Chord colors are `--c0` to `--c7` by the chord's place in the progression, set t
 A board is drawn in this order: the wood (light maple, dark rosewood in dark mode), the hover band, the inlays (single at 3, 5, 7, 9, 15, 17, 19, 21, double at 12 and 24), the frets, the nut, the strings (thicker for the wound ones) and their names. Then, from `notesMarkup`:
 
 - **Shapes:** a line through each voicing's four notes, in the chord's color, at 38% opacity, and over it a 14 px invisible line to point at (`.hit`).
-- **Dots:** one per chord per spot, in the chord's color, labeled with the tone's interval or note name. The root is a rounded square so it stands out without color. Where several chords have a note on the same spot (Overlay), their dots stand side by side in chord order, smaller if the fret is narrow; below a 6.5 px radius a dot has no label.
+- **Dots:** one per chord per spot, in the chord's color, labeled with the tone's interval or note name. The root is a rounded square so it stands out without color. Where several chords have a note on the same spot (Overlay), their dots stand side by side in chord order, smaller if the fret is narrow; below a 6.5 px radius a dot has no label. A dot's radius is 0.46 of the gap between strings, at most 14 px, and its label grows with it (`LABEL_FIT`).
+- **All notes** (`state.ui.allNotes`): every other place the chord's tones are on the neck, on all six strings (`notesOnNeck` in `theory.js`), as outlined dots in the chord's color (`.ghost`). A note that's in a drawn voicing is drawn as the voicing's. Outlined dots belong to no voicing, so they have no `data-v`: the mouse passes them by, and they fade with the rest while a voicing is under the mouse.
 
-Each shape and dot carries `data-v`, the voicings it belongs to (`<chord id>~<voicing id>`), which is all the mouse handling needs.
+Each shape and voicing dot carries `data-v`, the voicings it belongs to (`<chord id>~<voicing id>`), which is all the mouse handling needs.
 
-The fret numbers sit above the boards in their own SVG, the inlay frets darker. Moving the mouse over the boards shades the fret under it on every board (`.band`) and its number turns amber, so in Stacked you can follow one position down through all the chords.
+The fret numbers sit above the boards in their own SVG, the inlay frets darker. In Stacked each board also has its own row of them underneath (`numbers` in `geometry`, 14 px), so a fret reads at any board without looking up to the top: the inlay dots alone don't do it, since notes cover them, more so with All notes. Overlay has one board right under the numbers at the top, so it needs no row of its own. Moving the mouse over the boards shades the fret under it on every board (`.band`) and its number turns amber in every row, so in Stacked you can follow one position down through all the chords.
 
 ## Views
 
-- **Stacked:** a board per chord, 20 px between strings, headed by the chord's name, notes and roman numeral. On the right of the heading, the voicing under the mouse or the pinned one: inversion and frets. A click on a chord in the sidebar scrolls its board into view.
-- **Overlay:** one board for all the chords, between 30 and 40 px between strings depending on the window's height. A legend above names each chord with its pinned frets; the line below shows the voicing under the mouse, or the pinned path (`Dm7 x x 3 5 3 5 → G7 x x 3 4 3 3 → …`).
+- **Stacked:** a board per chord, headed by the chord's name, notes and roman numeral. On the right of the heading, the voicing under the mouse or the pinned one: inversion and frets. A click on a chord in the sidebar scrolls its board into view.
+- **Overlay:** one board for all the chords. A legend above names each chord with its pinned frets; the line below shows the voicing under the mouse, or the pinned path (`Dm7 x x 3 5 3 5 → G7 x x 3 4 3 3 → …`).
+
+### Height
+
+The Height slider sets the gap between strings, 16 to 44 px, which is how tall the boards are. Each view keeps its own (`state.ui.heights`): 20 px for Stacked and 32 px for Overlay at first, since one board for all the chords can be taller. The boards follow the slider as it moves, redrawn at most once a frame, and the value is saved like the rest of the state. A double-click on the slider goes back to the view's first height.
 
 ## Pins and voice leading
 
@@ -94,5 +99,6 @@ A card over the window, closed by its ×, `Esc` or a click outside it.
 - **Appearance:** System, Light or Dark. `set_theme` sets the window's theme, which is also what the page's `prefers-color-scheme` reports, and saves it; the page sets `data-theme` at once as well, which is all a plain browser has. At launch Rust creates the window already in the saved theme (`"create": false` in the config).
 - **Frets:** 12, 15 (the default), 17, 20, 22 or 24.
 - **Left-handed:** the nut on the right.
-- **Open strings:** voicings that use open strings, near the nut. On by default.
-- The version, from `app.getVersion`.
+- **Open strings:** voicings that use open strings, near the nut, and with All notes the open strings' notes. On by default.
+- The version, from `app.getVersion`, and links as in Unified Mail: GitHub, Releases, Website, Privacy policy and Support (the website's pages, see [development.md](development.md#website)). They open in the browser through `open_external`.
+- **Update to X**, an orange pill next to the version, when GitHub has a newer release (`checkForUpdate`: 10 s after launch, every 6 hours, and on opening Settings; a failed check stays quiet). The Settings button then has an orange dot and says which version is out. A click shows "Updating…" while `install_update` downloads and installs it; the app then closes and comes back as the new version. A failure shows in a toast, and the app looks for the update again. See [development.md](development.md#updates).

@@ -60,6 +60,8 @@ Standard tuning (`TUNING`, MIDI note numbers) is E2 A2 D3 G3 B3 E4. String 1 is 
 
 A voicing is `{ id, drop, set, notes, inversion, span, low, high }`, `notes` from low to high as `{ string, fret, pitch, tone }`. `fretText` writes it the usual way, from the low E string: `x x 0 2 1 1`. Its `id` (`drop2.4321.0-2-1-1`) is what a pin saves.
 
+`notesOnNeck(chord, { frets, openStrings })` gives every place on the neck where one of the chord's tones is, on all six strings, for All notes: the whole arpeggio the voicings are taken from.
+
 Shapes players know make good checks: the open Dm7 (`x x 0 2 1 1`) and G7 (`x x 0 0 0 1`) are Drop 2 voicings on the top strings, `8 x 9 9 8 x` is Cmaj7 Drop 3, `x 3 5 4 5 x` is Cmaj7 Drop 2 in root position.
 
 ## Voice leading

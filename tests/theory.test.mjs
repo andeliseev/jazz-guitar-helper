@@ -10,6 +10,7 @@ import {
   chordTones,
   fretText,
   inversionName,
+  notesOnNeck,
   parseChord,
   parseChords,
   presetChords,
@@ -153,6 +154,16 @@ test('drop voicings move the right voice down an octave', () => {
   assert.ok(lowToHigh('drop2', '4321').includes('5 R 3 7'));
   assert.ok(lowToHigh('drop3', '6432').includes('3 R 5 7'));
   assert.ok(lowToHigh('drop24', '6532').includes('R 5 3 7'));
+});
+
+test('finds every note of a chord on the neck', () => {
+  const notes = notesOnNeck(chord('Cmaj7'));
+  const onHighE = notes.filter((n) => n.string === 1).map((n) => n.fret);
+  assert.deepEqual(onHighE, [0, 3, 7, 8, 12, 15]); // E G B C E G
+  assert.ok(notes.every((n) => [0, 4, 7, 11].includes(n.pitch % 12) && n.pitch === TUNING[n.string] + n.fret));
+  assert.deepEqual([...new Set(notes.map((n) => n.string))], [1, 2, 3, 4, 5, 6]);
+  assert.ok(notesOnNeck(chord('Cmaj7'), { openStrings: false }).every((n) => n.fret > 0));
+  assert.ok(notesOnNeck(chord('Cmaj7'), { frets: 24 }).some((n) => n.fret === 24));
 });
 
 test('stays within the frets shown', () => {

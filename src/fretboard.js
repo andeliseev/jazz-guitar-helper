@@ -15,15 +15,19 @@ const OPEN_WIDTH = 28;
 const RIGHT_PAD = 8;
 // Dots smaller than this have no label.
 const MIN_LABELED_RADIUS = 6.5;
+// A row of fret numbers under a board (Stacked): its height, and how far below the wood they sit.
+const NUMBERS_HEIGHT = 14;
+const NUMBERS_OFFSET = 8;
 
 // Coordinates are rounded to a tenth of a pixel to keep the markup short.
 const r1 = (n) => Math.round(n * 10) / 10;
 
 /**
  * Where everything goes on a board `width` px wide with `frets` frets and `gap` px between strings.
- * High E on top, as in tab; left-handed mirrors it, the nut on the right.
+ * High E on top, as in tab; left-handed mirrors it, the nut on the right. With `numbers`, each board
+ * has its fret numbers under it.
  */
-export function geometry(width, frets, { gap = 22, leftHanded = false } = {}) {
+export function geometry(width, frets, { gap = 22, leftHanded = false, numbers = false } = {}) {
   const nut = NAMES_WIDTH + OPEN_WIDTH;
   const avail = Math.max(240, width - nut - RIGHT_PAD);
   const first = (avail * (1 - FRET_RATIO)) / (1 - FRET_RATIO ** frets);
@@ -36,7 +40,8 @@ export function geometry(width, frets, { gap = 22, leftHanded = false } = {}) {
     frets,
     gap,
     top,
-    height: top * 2 + gap * 5,
+    numbers,
+    height: top * 2 + gap * 5 + (numbers ? NUMBERS_HEIGHT : 0),
     leftHanded,
     flip,
     stringY: (string) => top + (string - 1) * gap,
@@ -62,7 +67,10 @@ export function geometry(width, frets, { gap = 22, leftHanded = false } = {}) {
   };
 }
 
-/** The board itself: wood, inlays, frets, nut, strings and their names, and the hover band. */
+/**
+ * The board itself: wood, inlays, frets, nut, strings and their names, the hover band, and with
+ * `numbers` the fret numbers under it.
+ */
 export function boardMarkup(geo) {
   const { frets, gap } = geo;
   const y1 = r1(geo.stringY(1) - gap * 0.5);
@@ -89,27 +97,37 @@ export function boardMarkup(geo) {
     out.push(`<line class="string" x1="${xOpen}" x2="${r1(xb)}" y1="${y}" y2="${y}" stroke-width="${r1(0.8 + (s - 1) * 0.28)}"/>`);
     out.push(`<text class="string-name" x="${r1(geo.flip(NAMES_WIDTH / 2))}" y="${y}">${STRING_NAMES[s]}</text>`);
   }
+  if (geo.numbers) out.push(fretNumbers(geo, y2 + NUMBERS_OFFSET));
   return out.join('');
 }
 
 /**
  * Chords' notes as dots, and a line through each voicing's notes. `layers` has one entry per chord:
- * { cls, voicings: [{ id, notes: [{ string, fret, label, root }] }] }, `cls` being its color class.
- * Where several chords share a spot, their dots stand side by side in chord order.
+ * { cls, voicings: [{ id, notes: [{ string, fret, label, root }] }], extras: [notes] }, `cls` being
+ * its color class and `extras` other notes of the chord to show, outlined (All notes). Where several
+ * chords share a spot, their dots stand side by side in chord order.
  */
 export function notesMarkup(geo, layers, { radius }) {
   // Each spot's chords, and which of their voicings use it.
   const spots = new Map();
+  const spotAt = (n) => {
+    const key = `${n.string}:${n.fret}`;
+    if (!spots.has(key)) spots.set(key, { string: n.string, fret: n.fret, entries: new Map() });
+    return spots.get(key);
+  };
   layers.forEach((layer, li) => {
     for (const v of layer.voicings) {
       for (const n of v.notes) {
-        const key = `${n.string}:${n.fret}`;
-        let spot = spots.get(key);
-        if (!spot) spots.set(key, (spot = { string: n.string, fret: n.fret, entries: new Map() }));
+        const spot = spotAt(n);
         let entry = spot.entries.get(li);
         if (!entry) spot.entries.set(li, (entry = { layer: li, label: n.label, root: n.root, ids: [] }));
         entry.ids.push(v.id);
       }
+    }
+    // A note that's in a voicing is drawn as the voicing's.
+    for (const n of layer.extras || []) {
+      const spot = spotAt(n);
+      if (!spot.entries.has(li)) spot.entries.set(li, { layer: li, label: n.label, root: n.root, ids: [], ghost: true });
     }
   });
 
@@ -141,22 +159,33 @@ export function notesMarkup(geo, layers, { radius }) {
   return `<g class="shapes">${shapes.join('')}</g><g class="hits">${hits.join('')}</g><g class="dots">${dots.join('')}</g>`;
 }
 
-// The root is a rounded square, the other tones circles, so it stands out without color.
+// Labels grow with the dot, longer ones less: [share of the radius, largest size in px].
+const LABEL_FIT = { 1: [1.15, 13], 2: [1, 12], 3: [0.85, 10.5] };
+
+// The root is a rounded square, the other tones circles, so it stands out without color. Extra
+// notes (`ghost`) belong to no voicing, so they have no `data-v` and the mouse passes them by.
 function dotMarkup(cls, entry, x, y, r) {
   const mark = entry.root
     ? `<rect class="mark" x="${r1(-r)}" y="${r1(-r)}" width="${r1(2 * r)}" height="${r1(2 * r)}" rx="${r1(r * 0.38)}"/>`
     : `<circle class="mark" r="${r1(r)}"/>`;
-  const size = r1(Math.min(r * 1.15, entry.label.length > 2 ? 8 : entry.label.length > 1 ? 9.5 : 11));
-  const text = r >= MIN_LABELED_RADIUS ? `<text font-size="${size}">${entry.label}</text>` : '';
-  return `<g class="dot ${cls}${entry.root ? ' root' : ''}" data-v="${entry.ids.join(' ')}" transform="translate(${r1(x)} ${r1(y)})">${mark}${text}</g>`;
+  const [share, largest] = LABEL_FIT[Math.min(entry.label.length, 3)];
+  const text = r >= MIN_LABELED_RADIUS ? `<text font-size="${r1(Math.min(r * share, largest))}">${entry.label}</text>` : '';
+  const classes = `dot ${cls}${entry.root ? ' root' : ''}${entry.ghost ? ' ghost' : ''}`;
+  const voicings = entry.ghost ? '' : ` data-v="${entry.ids.join(' ')}"`;
+  return `<g class="${classes}"${voicings} transform="translate(${r1(x)} ${r1(y)})">${mark}${text}</g>`;
 }
 
-/** Fret numbers over the fret spaces, the ones with inlays stronger. */
+/** The fret numbers above the boards, `height` px tall. */
 export function rulerMarkup(geo, height) {
+  return fretNumbers(geo, height / 2);
+}
+
+// A number centered over each fret's space at `y`, the frets with inlays stronger.
+function fretNumbers(geo, y) {
   const out = [];
   for (let f = 1; f <= geo.frets; f++) {
     const marked = INLAYS.includes(f) || DOUBLE_INLAYS.includes(f);
-    out.push(`<text class="fret-number${marked ? ' marked' : ''}" data-fret="${f}" x="${r1(geo.noteX(f))}" y="${r1(height / 2)}">${f}</text>`);
+    out.push(`<text class="fret-number${marked ? ' marked' : ''}" data-fret="${f}" x="${r1(geo.noteX(f))}" y="${r1(y)}">${f}</text>`);
   }
   return out.join('');
 }

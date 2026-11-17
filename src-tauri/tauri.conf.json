@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Jazz Guitar Drop Helper",
+  "productName": "Jazz Guitar Helper",
   "version": "0.1.0",
-  "identifier": "com.andeliseev.jazz-guitar-drop-helper",
+  "identifier": "com.andeliseev.jazz-guitar-helper",
   "build": {
     "frontendDist": "../src"
   },
@@ -12,7 +12,7 @@
       {
         "label": "main",
         "create": false,
-        "title": "Jazz Guitar Drop Helper",
+        "title": "Jazz Guitar Helper",
         "width": 1280,
         "height": 820,
         "minWidth": 960,
@@ -38,6 +38,15 @@
     ],
     "macOS": {
       "signingIdentity": "-"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhDRDBGN0YyM0EwNTcxRDcKUldUWGNRVTY4dmZRakJVMkx2YnBCejVVSWNnVmY0ckpyNGRncENocXBDS3ZZeUkxaE1rK2VUSC8K",
+      "endpoints": ["https://github.com/andeliseev/jazz-guitar-helper/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

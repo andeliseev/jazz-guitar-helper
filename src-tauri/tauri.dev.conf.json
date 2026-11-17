@@ -1,16 +1,21 @@
 {
-  "identifier": "com.andeliseev.jazz-guitar-drop-helper.devtest",
+  "identifier": "com.andeliseev.jazz-guitar-helper.devtest",
   "app": {
     "windows": [
       {
         "label": "main",
         "create": false,
-        "title": "Jazz Guitar Drop Helper (test)",
+        "title": "Jazz Guitar Helper (test)",
         "width": 1280,
         "height": 820,
         "minWidth": 960,
         "minHeight": 560
       }
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    }
   }
 }
