@@ -4,6 +4,8 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+## 0.2.1 (2026-11-17)
+
 - Chord tones comes first, before the drop types, and is where a new progression starts; the number keys follow the buttons: 1 Chord tones, 2 Drop 2, 3 Drop 3, 4 Drop 2&4.
 - The fret numbers sit under every fretboard, Overlay's too, instead of in a row above them all.
 - Frets, Height and Fit stay together when the toolbar wraps.
