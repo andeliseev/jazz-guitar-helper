@@ -4,6 +4,16 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+- Chord tones comes first, before the drop types, and is where a new progression starts; the number keys follow the buttons: 1 Chord tones, 2 Drop 2, 3 Drop 3, 4 Drop 2&4.
+- The fret numbers sit under every fretboard, Overlay's too, instead of in a row above them all.
+- Frets, Height and Fit stay together when the toolbar wraps.
+- The metronome always plays round and round, so Loop is gone, and Follow is off at first.
+- Type the tempo, beside its slider.
+- The click has sounds to choose (Tick, Wood, Hi-hat, Beep, or none) and its own volume, behind the click button in the metronome bar.
+- A chord longer than a bar sounds again at each bar, and the staff writes it again in each bar.
+- In Overlay with Follow, the next chord no longer flashes before it fades.
+- A right-click opens no menu on sliders and lists either.
+
 ## 0.2.0 (2026-11-17)
 
 - Scales: turn them on, and each fretboard shows a scale to improvise over its chord, around the chord's notes, with the other notes named as tensions (9, 11, 13, ♭9…). Choose another over the fretboard; ready-made progressions start with the usual one for each chord's place in the key.

@@ -16,6 +16,7 @@ const DEBUG_PORT = 9339;
 // A chord as app.js keeps it; letter is an index into C D E F G A B.
 const chord = (letter, acc, quality, role) => ({ root: { letter, acc }, quality, role });
 const STATE = {
+  mode: 'voicings',
   leading: true,
   staff: true,
   anchor: 1,

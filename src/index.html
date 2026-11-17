@@ -63,10 +63,10 @@
         <!-- What's voiced. -->
         <div class="tool-row">
           <div id="drop" class="segmented" role="radiogroup" aria-label="What the fretboards show">
-            <button role="radio" data-drop="drop2" title="Drop 2 (1)">Drop 2</button>
-            <button role="radio" data-drop="drop3" title="Drop 3 (2)">Drop 3</button>
-            <button role="radio" data-drop="drop24" title="Drop 2&amp;4 (3)">Drop 2&amp;4</button>
-            <button role="radio" title="Every note of each chord on the whole neck, without voicings (4)">Chord tones</button>
+            <button role="radio" title="Every note of each chord on the whole neck, without voicings (1)">Chord tones</button>
+            <button role="radio" data-drop="drop2" title="Drop 2 (2)">Drop 2</button>
+            <button role="radio" data-drop="drop3" title="Drop 3 (3)">Drop 3</button>
+            <button role="radio" data-drop="drop24" title="Drop 2&amp;4 (4)">Drop 2&amp;4</button>
           </div>
           <div class="group">
             <span class="group-label">Strings</span>
@@ -107,15 +107,18 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h4v-4h4v-4h4V7h4"/></svg>
             Scales
           </button>
-          <label class="height-pick" title="How many frets the fretboards show">
-            <span class="group-label">Frets</span>
-            <select id="frets" aria-label="Frets"></select>
-          </label>
-          <label class="height-pick" title="How tall the fretboards are; Stacked and Overlay each keep their own. Double-click to reset.">
-            <span class="group-label">Height</span>
-            <input id="height" type="range" min="16" max="44" step="1" aria-label="Fretboard height">
-          </label>
-          <button id="fit" class="link-btn" title="As tall as the window allows with every fretboard showing">Fit</button>
+          <!-- The fretboards' size, one group so it wraps as a whole. -->
+          <div class="size-group">
+            <label class="height-pick" title="How many frets the fretboards show">
+              <span class="group-label">Frets</span>
+              <select id="frets" aria-label="Frets"></select>
+            </label>
+            <label class="height-pick" title="How tall the fretboards are; Stacked and Overlay each keep their own. Double-click to reset.">
+              <span class="group-label">Height</span>
+              <input id="height" type="range" min="16" max="44" step="1" aria-label="Fretboard height">
+            </label>
+            <button id="fit" class="link-btn" title="As tall as the window allows with every fretboard showing">Fit</button>
+          </div>
         </div>
       </header>
 
@@ -131,7 +134,7 @@
         <div id="staff-scroll"><svg id="staff-svg" role="img" aria-label="The progression on a staff"></svg></div>
       </section>
 
-      <!-- The fretboards (renderBoards): fret numbers on top, then a board per chord, or one for all. -->
+      <!-- The fretboards (renderBoards): a board per chord, or one for all, each with its fret numbers under it. -->
       <div id="boards"></div>
       <div id="empty" class="empty" hidden>
         <p id="empty-text"></p>
@@ -144,16 +147,29 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="icon-play" d="M8 5.5v13l10.5-6.5z"/><path class="icon-stop" d="M7 7h10v10H7z"/></svg>
           <span id="play-text">Play</span>
         </button>
-        <label class="tempo">
-          <span class="group-label">Tempo</span>
-          <input id="tempo" type="range" min="40" max="240" step="1" aria-label="Tempo in beats a minute">
-          <span><output id="tempo-value" for="tempo">100</output> BPM</span>
-        </label>
+        <div class="tempo" title="Tempo in beats a minute: drag, or type a number from 40 to 240">
+          <input id="tempo" type="range" min="40" max="240" step="1" aria-label="Tempo">
+          <input id="tempo-number" type="number" min="40" max="240" step="1" aria-label="Tempo in beats a minute">
+          <span>BPM</span>
+        </div>
         <div class="chips">
           <button class="chip" data-option="countIn" aria-pressed="true" title="A bar of clicks before the first chord">Count-in</button>
-          <button class="chip" data-option="loop" aria-pressed="true" title="Start over after the last chord">Loop</button>
-          <button class="chip" data-option="click" aria-pressed="true" title="The metronome's click on every beat">Click</button>
-          <button class="chip" data-option="follow" aria-pressed="true" title="While playing, only the chord playing and the next one, as tall as the window allows">Follow</button>
+          <button class="chip" data-option="follow" aria-pressed="false" title="While playing, only the chord playing and the next one, as tall as the window allows">Follow</button>
+        </div>
+        <!-- The click (renderSound): the button names its sound; its card chooses it and how loud. -->
+        <div class="sound-pick">
+          <button id="click-button" class="chip toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="click-card"
+                  title="The metronome's click on every beat">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 21h7l-2.2-17h-2.6z"/><path d="M12 16l5.5-9.5"/></svg>
+            <span id="click-name">Tick</span>
+          </button>
+          <div id="click-card" class="sound-card" role="dialog" aria-label="Click" hidden>
+            <span class="group-label">Click</span>
+            <div id="clicks" class="sound-list" role="radiogroup" aria-label="Click sound"></div>
+            <label class="sound-row" title="The click against the chords">
+              <span>Volume</span><input id="click-volume" type="range" min="0" max="100" step="1">
+            </label>
+          </div>
         </div>
         <!-- The chords' sound (renderSound): the button names it; its card, hidden until then, chooses it. -->
         <div class="sound-pick">

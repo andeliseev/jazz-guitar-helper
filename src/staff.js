@@ -73,14 +73,11 @@ export function staffMarkup(entries, available) {
         notes.push(chordMarkup([note], nx, 0, y));
       });
     } else {
-      // Split at the bar lines: each piece is a whole note (a bar) or a half note, tied to the next.
-      let prev = null;
+      // Split at the bar lines, as the player sounds it again at each bar: a whole note for a bar,
+      // a half note for half of one.
       for (let b = start; b < start + e.beats; ) {
         const until = Math.min((Math.floor(b / 4) + 1) * 4, start + e.beats);
-        const piece = chordMarkup(e.notes, x(b) + 18, until - b, y);
-        notes.push(piece);
-        if (prev) notes.push({ markup: ties(prev.heads, piece.heads) });
-        prev = piece;
+        notes.push(chordMarkup(e.notes, x(b) + 18, until - b, y));
         b = until;
       }
     }
@@ -95,7 +92,7 @@ export function staffMarkup(entries, available) {
 
 /**
  * Notes sounding together at `cx`, for `beats` (4: a whole note, 2: a half note, with a stem; 0: a
- * scale's note, filled). Returns { markup, heads }, the heads' places for ties.
+ * scale's note, filled). Returns { markup }.
  */
 function chordMarkup(notes, cx, beats, y) {
   const out = [];
@@ -133,29 +130,9 @@ function chordMarkup(notes, cx, beats, y) {
     const [from, to] = up ? [lowest.y, highest.y - LINE * 3.5] : [highest.y, lowest.y + LINE * 3.5];
     out.push(`<line class="stem" x1="${sx}" x2="${sx}" y1="${r1(from)}" y2="${r1(to)}"/>`);
   }
-  return { markup: out.join(''), heads };
+  return { markup: out.join('') };
 }
 
 function ledger(x, y) {
   return `<line class="ledger" x1="${r1(x - 9)}" x2="${r1(x + 9)}" y1="${y}" y2="${y}"/>`;
-}
-
-/**
- * A tie from each head in `from` to the same note in `to`: a thin crescent curving away from the
- * middle line, deeper the longer it is, so a tie across a bar doesn't read as a staff line.
- */
-function ties(from, to) {
-  return from
-    .map((a) => {
-      const b = to.find((h) => h.pos === a.pos);
-      if (!b) return '';
-      const dir = a.pos >= MIDDLE ? -1 : 1;
-      const x1 = a.x + HEAD_RX;
-      const x2 = b.x - HEAD_RX;
-      const mid = (x1 + x2) / 2;
-      const yy = a.y + dir * 4;
-      const depth = 6 + Math.min(8, (x2 - x1) / 30);
-      return `<path class="tie" d="M${r1(x1)} ${r1(yy)}Q${r1(mid)} ${r1(yy + dir * depth)} ${r1(x2)} ${r1(yy)}Q${r1(mid)} ${r1(yy + dir * (depth - 2.2))} ${r1(x1)} ${r1(yy)}Z"/>`;
-    })
-    .join('');
 }

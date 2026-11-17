@@ -185,11 +185,6 @@ function dotMarkup(cls, entry, x, y, r) {
   return `<g class="${classes}"${voicings} transform="translate(${r1(x)} ${r1(y)})">${mark}${text}</g>`;
 }
 
-/** The fret numbers above the boards, `height` px tall. */
-export function rulerMarkup(geo, height) {
-  return fretNumbers(geo, height / 2);
-}
-
 // A number centered over each fret's space at `y`, the frets with inlays stronger.
 function fretNumbers(geo, y) {
   const out = [];

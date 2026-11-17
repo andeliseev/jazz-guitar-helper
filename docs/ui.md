@@ -15,10 +15,10 @@ Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTau
 `#app` is a two-column grid: a 264 px sidebar and the main pane. Its single row is `minmax(0, 1fr)` so the fretboards scroll inside the window.
 
 - **Sidebar:** the brand, **Progression** (Save and Clear in its heading, a row per chord, then **Add chords** with its suggestions), **Presets** (a key and the ready-made progressions), **My presets** (the progressions saved), and Settings at the bottom. It scrolls when the progression is long.
-- **Toolbar:** two rows. The first chooses what the boards show: a drop type or Chord tones (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Frets (a select: 12, 15, the default, 17, 20, 22 or 24) and Height (a slider). When the pane is wide enough, the second row sits beside the first.
+- **Toolbar:** two rows. The first chooses what the boards show: Chord tones or a drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Scales, and the boards' size in one group that wraps as a whole (`.size-group`): Frets (a select: 12, 15, the default, 17, 20, 22 or 24), Height (a slider) and Fit. When the pane is wide enough, the second row sits beside the first.
 - **Staff** (`#staff`, when Staff is on): under the toolbar, the progression's bars (see [Staff](#staff)).
-- **Fretboards** (`#boards`): fret numbers on top, sticky while the boards scroll, then a board per chord (Stacked) or one board for all (Overlay). With no chord to show, an empty state says why, with a button that adds a ii–V–I.
-- **Player** (`#player`): along the bottom, the metronome: Play, Tempo, Count-in, Loop, Click, Follow, the chords' sound, the beat, what's playing, and the Staff switch (see [Playing](#playing)).
+- **Fretboards** (`#boards`): a board per chord (Stacked) or one board for all (Overlay), each with its fret numbers under it. With no chord to show, an empty state says why, with a button that adds a ii–V–I.
+- **Player** (`#player`): along the bottom, the metronome: Play, the tempo, Count-in, Follow, the click's sound, the chords' sound, the beat, what's playing, and the Staff switch (see [Playing](#playing)).
 
 The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width, and a new width redraws them (`ResizeObserver`). How tall they are is the user's choice (see [Height](#height)).
 
@@ -53,7 +53,7 @@ A board is drawn in this order: the wood (light maple, dark rosewood in dark mod
 
 Each shape and voicing dot carries `data-v`, the voicings it belongs to (`<chord id>~<voicing id>`), which is all the mouse handling needs.
 
-The fret numbers sit above the boards in their own SVG, the inlay frets darker. In Stacked each board also has its own row of them underneath (`numbers` in `geometry`, 14 px), so a fret reads at any board without looking up to the top: the inlay dots alone don't do it, since notes cover them, more so with All notes. Overlay has one board right under the numbers at the top, so it needs no row of its own. Moving the mouse over the boards shades the fret under it on every board (`.band`) and its number turns amber in every row, so in Stacked you can follow one position down through all the chords.
+Each board, in Stacked and in Overlay, has its fret numbers in a row under it (`numbers` in `geometry`, 14 px), the inlay frets darker, so a fret reads at any board without looking elsewhere: the inlay dots alone don't do it, since notes cover them, more so with All notes. There's no row of numbers above the boards. Moving the mouse over the boards shades the fret under it on every board (`.band`) and its number turns amber in every row, so in Stacked you can follow one position down through all the chords.
 
 ## Views
 
@@ -62,9 +62,9 @@ The fret numbers sit above the boards in their own SVG, the inlay frets darker. 
 
 ### Chord tones
 
-The fourth choice next to the drop types (`state.ui.mode`, `voicings` or `tones`; key `4`) shows every note of each chord on the whole neck instead of voicings: the places All notes would outline, as dots of their own (`notes` in a board's layer), with no lines and no `data-v`, so the mouse passes them by. Stacked and Overlay, Intervals or Notes, Frets and Height work as with voicings; in Overlay, notes the chords share stand side by side, which shows what can stay put from one chord to the next.
+The first choice, before the drop types (`state.ui.mode`, `tones` or `voicings`; key `1`), and where a new progression starts, shows every note of each chord on the whole neck instead of voicings: the places All notes would outline, as dots of their own (`notes` in a board's layer), with no lines and no `data-v`, so the mouse passes them by. Stacked and Overlay, Intervals or Notes, Frets and Height work as with voicings; in Overlay, notes the chords share stand side by side, which shows what can stay put from one chord to the next.
 
-What only voicings use (Strings, Inversions, Voice leading, All notes) stays where it is, dimmed and disabled, so the toolbar doesn't move; the mouse goes through a dimmed string set or inversion to its group, whose tooltip says to choose a drop type. `ui.drop` keeps the drop type, and choosing it again (or `1`, `2`, `3`) brings the voicings back. The pins stay too: `computeRows` doesn't start a path while there are no voicings, and `Esc` doesn't unpin.
+What only voicings use (Strings, Inversions, Voice leading, All notes) stays where it is, dimmed and disabled, so the toolbar doesn't move; the mouse goes through a dimmed string set or inversion to its group, whose tooltip says to choose a drop type. `ui.drop` keeps the drop type, and choosing it again (or `2`, `3`, `4`) brings the voicings back. The pins stay too: `computeRows` doesn't start a path while there are no voicings, and `Esc` doesn't unpin.
 
 ### Height
 
@@ -84,7 +84,7 @@ Each board's heading (Stacked) and each legend item (Overlay) gets a picker (`sc
 
 What each chord holds (`staffEntries`), chosen above the staff (`staffShows`):
 
-- **Chords:** its pinned voicing, the pitches it sounds an octave up; with Voice leading on, the whole path, so the voices' movement shows. A chord with no voicing pinned, or any chord in Chord tones, shows its notes (`chordNotes`) from the root under middle C, in grey: they aren't a voicing. Its length is split at the bar lines into whole notes (a bar) and half notes (with a stem: up when the notes sit low, down when high), tied; ties are thin crescents curving away from the middle line, deeper the longer they are.
+- **Chords:** its pinned voicing, the pitches it sounds an octave up; with Voice leading on, the whole path, so the voices' movement shows. A chord with no voicing pinned, or any chord in Chord tones, shows its notes (`chordNotes`) from the root under middle C, in grey: they aren't a voicing. Its length is split at the bar lines and written again in each bar, as the player sounds it again: a whole note for a bar, a half note (with a stem: up when the notes sit low, down when high) for half of one; no ties.
 - **Scales:** its scale from the root to the octave, as filled heads spread over its length, clear of the bar lines.
 
 A note a step above the one under it goes beside it; accidentals stand left of the notes, moved further left when they'd touch; notes off the staff get ledger lines; the staff is as tall as its highest and lowest notes need. Chord symbols are what was typed, so `staff.js` escapes them. The playing chord's span is tinted (`.staff-now`) and a line marks the beat (`.staff-playhead`).
@@ -93,12 +93,13 @@ A note a step above the one under it goes beside it; accidentals stand left of t
 
 The player bar plays the progression with a metronome: **Play** (or `Space`, unless a button has the focus) starts it, again stops it.
 
-- **Timing:** Web Audio, scheduled 0.12 s ahead every 25 ms (`schedule`), so the beats stay even when the page is busy; each beat also sets a timer for the screen (`showBeat`). Each chord plays for its `beats` (`timeline`); the tempo (`bpm`, 40 to 240) applies from the next beat. **Count-in** plays a bar of clicks first; **Loop** starts over after the last chord, or else it stops there. The progression can change while it plays: it reads the chords at every beat.
-- **Sound:** **Click** is a short tick on every beat, higher on the first of the bar. Each chord sounds as it starts (`chordSound`): its pinned voicing, or else its notes from the root, and with **Bass** the root an octave lower. How, the sound button says (`state.ui.sound`, `SOUNDS`): **Pluck** strums it low to high, a burst of noise run through a delay one period long (Karplus–Strong), made once per pitch; a pad holds it for the chord's whole length, oscillators per note through a low-pass filter, fading in over its attack and out over its release, so one chord melts into the next: **Ambient** (a slow filter sweep, a long tail), **Warm pad** (two detuned saws), **Strings** (three saws with vibrato), **Organ** (sines); or **Off**. No samples to ship.
-  - The chords go through one mix (`makeMix`): at **Volume**, dry and through a reverb at **Space** (a convolver whose impulse is a few seconds of fading noise), into a compressor; the click goes straight to the compressor. Space and Volume change at once; a new sound starts with the next chord. Stopping fades the pads still sounding (`fadeVoices`).
-  - The sound button names the sound and is on (tinted) unless it's Off; its card (`#sound-card`), hidden until the button is clicked, holds the choice, Space, Volume and Bass, and closes on a click elsewhere or `Esc`.
-- **Follow** (`follow`, on at first): while playing, the boards show only the chord playing and the next one (`followedRows`; the first two during the count-in, round to the first again when looping), drawn as tall as the pane allows (`fittedGap`, without touching the saved height), and drawn again as each chord starts. Height and Fit wait, dimmed. Stopping, or turning Follow off, brings every board back at the slider's height.
-- **Marks** (`markPlaying`, again after any render): the chord's row in the sidebar, its board (the others rest at a third; it scrolls into view as it starts), in Overlay the other chords' dots and lines faded, its span on the staff (which scrolls to it), the beat's dot, and "Dm7 · bar 2 of 4" or "Count-in 3".
+- **Timing:** Web Audio, scheduled 0.12 s ahead every 25 ms (`schedule`), so the beats stay even when the page is busy; each beat also sets a timer for the screen (`showBeat`). Each chord plays for its `beats` (`timeline`), round and round. The tempo (`bpm`, 40 to 240) comes from the slider or the number next to it, taken as it's typed while it's in range and set right on leaving the field; it applies from the next beat. **Count-in** plays a bar of clicks first. The progression can change while it plays: it reads the chords at every beat.
+- **Click** (`state.ui.click`, `CLICKS`): on every beat, higher or longer on the first of the bar: **Tick** (a short triangle), **Wood** (two sines and a knock of band-passed noise, a woodblock), **Hi-hat** (noise above 7 kHz), **Beep** (a sine), or **Off**; at its own volume (`clickVolume`).
+- **Chords** (`chordSound`): its pinned voicing, or else its notes from the root, and with **Bass** the root an octave lower; as the chord starts and again at each bar it lasts into, so a two-bar chord sounds twice. How, `state.ui.sound` says (`SOUNDS`): **Pluck** strums it low to high, a burst of noise run through a delay one period long (Karplus–Strong), made once per pitch; a pad holds it to the end of the bar (or of the chord, if that's sooner), oscillators per note through a low-pass filter, fading in over its attack and out over its release, so it melts into what comes next: **Ambient** (a slow filter sweep, a long tail), **Warm pad** (two detuned saws), **Strings** (three saws with vibrato), **Organ** (sines); or **Off**. No samples to ship.
+  - Everything goes through one mix (`makeMix`): the chords at **Volume**, dry and through a reverb at **Space** (a convolver whose impulse is a few seconds of fading noise), and the click at its volume, dry, into a compressor. Volumes and Space change at once; a new sound starts with the next bar. Stopping fades the pads still sounding (`fadeVoices`).
+  - Two buttons name the click's and the chords' sound, on (tinted) unless Off; each opens a card (`#click-card`, `#sound-card`, `showCard`), one at a time, with the choice and its settings, closing on a click elsewhere or `Esc`.
+- **Follow** (`follow`, off at first): while playing, the boards show only the chord playing and the next one (`followedRows`; the first two during the count-in, round to the first after the last), drawn as tall as the pane allows (`fittedGap`, without touching the saved height), and drawn again as each chord starts. Height and Fit wait, dimmed. Stopping, or turning Follow off, brings every board back at the slider's height.
+- **Marks** (`markPlaying`, again after any render): the chord's row in the sidebar, its board (the others rest at a third; it scrolls into view as it starts), in Overlay the other chords' dots and lines faded (at once, without the dots' fade, or the chord Follow has just drawn would flash), its span on the staff (which scrolls to it), the beat's dot, and "Dm7 · bar 2 of 4" or "Count-in 3".
 
 ## Pins and voice leading
 
@@ -131,7 +132,7 @@ The player bar plays the progression with a metronome: **Play** (or `Space`, unl
 
 | Key | Action |
 | --- | --- |
-| `1` / `2` / `3` / `4` | Drop 2 / Drop 3 / Drop 2&4 / Chord tones |
+| `1` / `2` / `3` / `4` | Chord tones / Drop 2 / Drop 3 / Drop 2&4 |
 | `V` | Stacked or Overlay |
 | `N` | Intervals or Notes |
 | `L` | Voice leading |
@@ -143,7 +144,7 @@ The player bar plays the progression with a metronome: **Play** (or `Space`, unl
 
 Shortcuts don't act while typing in a field or with Cmd, Ctrl or Alt held. With a Latin layout they go by the character typed; with any other, such as Russian, by the key's position (`e.code`), so `V` works whichever layout is on.
 
-In the app, a right-click shows no menu: the web view's own (Back, Reload, Print) means nothing there. Text fields keep it, for Cut, Copy and Paste, and with Shift held it shows anywhere, which gives Inspect in the test app. A page in a browser keeps its menu.
+In the app, a right-click shows no menu: the web view's own (Back, Reload, Print) means nothing there. Text fields keep it, for Cut, Copy and Paste; sliders, checkboxes and lists don't, having nothing to cut or paste. With Shift held it shows anywhere, which gives Inspect in the test app. A page in a browser keeps its menu.
 
 ## Settings
 

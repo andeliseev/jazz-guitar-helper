@@ -428,7 +428,9 @@ select { padding: 3px 6px; cursor: pointer; }
 .height-pick input { width: 110px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 /* While Follow sizes the boards (renderPlayer), Height and Fit wait, dimmed. */
 .height-pick.off { opacity: 0.45; pointer-events: none; }
-#fit { margin-left: -10px; }
+/* Frets, Height and Fit: one group, so the toolbar wraps it as a whole. */
+.size-group { display: flex; flex: none; align-items: center; gap: 18px; }
+#fit { margin-left: -12px; }
 
 /* Fretboards */
 
@@ -440,9 +442,7 @@ select { padding: 3px 6px; cursor: pointer; }
   overflow-x: hidden;
   overflow-y: auto;
 }
-/* Fret numbers stay on top while the boards scroll under them. */
-.ruler { position: sticky; top: 0; z-index: 2; padding-top: 8px; background: var(--panel); }
-.ruler svg { display: block; }
+/* Under every board, in Stacked and Overlay. */
 .fret-number { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
 .fret-number.marked { fill: var(--text); font-weight: 600; }
 .fret-number.active { fill: var(--accent); font-weight: 700; }
@@ -529,11 +529,9 @@ select { padding: 3px 6px; cursor: pointer; }
 .head { fill: none; stroke: var(--text); stroke-width: 1.5; }
 .head.filled { fill: var(--text); }
 .stem { stroke: var(--text); stroke-width: 1.2; }
-.tie { fill: var(--text); stroke: var(--text); stroke-width: 0.4; }
 .accidental { fill: var(--text); font-size: 13px; text-anchor: middle; dominant-baseline: central; }
 /* A chord with no voicing pinned shows its notes, in grey: they aren't a voicing. */
-.staff-notes.muted .head, .staff-notes.muted .stem, .staff-notes.muted .tie { stroke: var(--muted); }
-.staff-notes.muted .tie { fill: var(--muted); }
+.staff-notes.muted .head, .staff-notes.muted .stem { stroke: var(--muted); }
 .staff-notes.muted .head.filled, .staff-notes.muted .accidental { fill: var(--muted); }
 .staff-now { fill: var(--selected); }
 .staff-playhead { stroke: var(--accent); stroke-width: 2; }
@@ -546,8 +544,9 @@ select { padding: 3px 6px; cursor: pointer; }
 #play[aria-pressed="true"] .icon-stop { display: inline; }
 #play[aria-pressed="true"] { background: var(--selected); color: var(--accent); }
 .tempo { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
-.tempo input { width: 96px; margin: 0; accent-color: var(--accent); cursor: pointer; }
-.tempo output { display: inline-block; min-width: 3ch; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.tempo input[type="range"] { width: 96px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+/* The tempo typed: a narrow field, its number in the text color. */
+.tempo input[type="number"] { width: 56px; padding: 3px 4px 3px 8px; color: var(--text); font-variant-numeric: tabular-nums; }
 #beats { display: flex; gap: 6px; }
 #beats i { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
 #beats i.on { background: var(--accent); }
@@ -582,7 +581,9 @@ select { padding: 3px 6px; cursor: pointer; }
 /* While playing (markPlaying): the chord sounding stands out, the others rest. */
 .chord-item.playing { background: var(--selected); }
 .row.resting { opacity: 0.35; }
-.overlay-view .board .resting { opacity: 0.15; }
+/* At once, without the dots' fade: Follow draws new boards as each chord starts, and a fade from
+   full would flash the next chord before it rests. */
+.overlay-view .board .resting { opacity: 0.15; transition: none; }
 
 .empty {
   flex: 1;
