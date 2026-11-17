@@ -1,0 +1,70 @@
+# <img src="app-icon.svg" width="36" height="36" align="top" alt=""> Jazz Guitar Drop Helper
+
+A small desktop app for Windows and macOS that shows drop voicings on the guitar fretboard: every Drop 2, Drop 3 and Drop 2&4 voicing of every chord in a progression, all at once.
+
+- **Add a progression** by typing its chord symbols (`Dm7 G7 Cmaj7`, `B♭Δ`, `F♯ø`, `E♭°7`), or in one click: ii–V–I, ii–V–i, I–vi–ii–V or iii–VI–ii–V in any key
+- **Drop 2, Drop 3 and Drop 2&4**, on any of their string sets, in any inversion
+- **Every position at once:** a fretboard per chord, lined up fret by fret so you see what's under your hand for each chord, or all the chords on one fretboard in their own colors
+- A line joins each voicing's notes, so its shape stands out. The root is a square, and the dots show intervals (R, ♭3, 5, ♭7) or note names
+- **Point at a voicing** to see its frets (`x x 3 5 3 5`) and inversion, and **click** it to pin it
+- **Voice leading:** pin a voicing of one chord and the others follow with their closest voicings on the same strings, the smoothest way through the progression
+- Notes are spelled as musicians write them: B♭maj7 is B♭ D F A, F♯m7♭5 is F♯ A C E
+- Light or dark look, a left-handed fretboard, 12 to 24 frets
+- Works offline and keeps your progression between launches
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.png">
+  <img src="docs/images/screenshot-light.png" alt="Jazz Guitar Drop Helper with a ii–V–I in C: a fretboard per chord with every Drop 2 voicing on the top strings, and a voice-led path pinned">
+</picture>
+
+## Download
+
+Get the latest version from the **[Releases page](https://github.com/andeliseev/jazz-guitar-helper/releases/latest)**. What changed in each version is in the [changelog](CHANGELOG.md).
+
+| System | File |
+| --- | --- |
+| Windows 10 / 11 | `Jazz.Guitar.Drop.Helper_<version>_x64-setup.exe` (or the `.msi`) |
+| macOS (Apple Silicon and Intel) | `Jazz.Guitar.Drop.Helper_<version>_universal.dmg` |
+
+### First launch
+
+The app isn't code-signed yet, so your system asks once before opening it:
+
+- **Windows:** "Windows protected your PC" → **More info** → **Run anyway**.
+- **macOS:** open the app, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+## Using it
+
+**Chords.** Type chord symbols into **Add chords** and press Enter: `Dm7 G7 Cmaj7`, or a line from a chart, `| Gm7♭5 | C7♭9 | Fm6 |`. The usual ways of writing each chord work: `CΔ7`, `C-7`, `Cø`, `C°7`, `C7sus4`, `C7♯5`. Chords the app doesn't voice yet are shown as the nearest one it does, and say so: `Cmaj9` as Cmaj7, `G13` as G7, a plain `C` as C6. **Quick add** puts a ready-made progression in the key you choose. In the sidebar, point at a chord for its buttons: hide it from the fretboard, move it up or down, or remove it. Double-click its name to type another chord in its place.
+
+**Voicings.** Choose **Drop 2**, **Drop 3** or **Drop 2&4**, then the **strings** to play them on (Drop 2 on four strings next to each other, the others with one string skipped) and the **inversions**: Root has the root in the bass, 1st the 3rd, 2nd the 5th, 3rd the 7th. Double-click a string set or an inversion to show only that one.
+
+**Views.** **Stacked** shows a fretboard per chord, one under another and lined up, so a column of frets shows what each chord has in that position. **Overlay** puts every chord on one fretboard in its own color; where chords share a note, their dots stand side by side. **Intervals** or **Notes** chooses what the dots say.
+
+**Pinning and voice leading.** Point at a voicing to see its frets and inversion; click it to pin it, and its frets show under the chord in the sidebar. A note that's in several voicings pins each of them in turn as you click. Turn on **Voice leading** and pinning a voicing of one chord pins the closest voicing of every other chord on the same strings: the one whose notes move least. `Esc` unpins everything.
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `1` / `2` / `3` | Drop 2 / Drop 3 / Drop 2&4 |
+| `V` | Stacked or Overlay |
+| `N` | Intervals or Notes on the dots |
+| `L` | Voice leading on or off |
+| `A` | Add chords |
+| `Z` | Undo, while its message shows (removing a chord, clearing the progression) |
+| `Esc` | Unpin all voicings, or close Settings |
+
+## Privacy
+
+Jazz Guitar Drop Helper runs entirely on your computer and connects to nothing: no servers, no analytics, no tracking. Your progression and choices are saved in a settings file in the app's data folder.
+
+## Building from source and contributing
+
+The app is built with [Tauri 2](https://v2.tauri.app/): a small Rust shell around your system's own web view, with the music theory and the fretboard in plain JavaScript. To build it yourself, see [docs/development.md](docs/development.md). How it works inside is in [docs/](docs/README.md).
+
+Bug reports and pull requests are welcome.
+
+## License
+
+[MIT](LICENSE)

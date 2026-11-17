@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jazz Guitar Drop Helper</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <!-- The app icon (app-icon.svg). -->
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#dd6b10"/><g fill="none" stroke="#fff" stroke-linecap="round"><path d="M7.5 6.6h9" stroke-width="1.7"/><path d="M7.5 10.4h9M7.5 14.2h9M7.5 18h9M7.5 6.6v11.4M10.5 6.6v11.4M13.5 6.6v11.4M16.5 6.6v11.4" stroke-width="0.85"/></g><g fill="#fff"><circle cx="7.5" cy="8.5" r="1.5"/><circle cx="10.5" cy="16.1" r="1.5"/><circle cx="13.5" cy="12.3" r="1.5"/><circle cx="16.5" cy="16.1" r="1.5"/></g></svg>
+        <div class="brand-name"><small>Jazz Guitar</small>Drop Helper</div>
+      </div>
+
+      <div class="side-head">
+        <span class="side-title">Progression</span>
+        <button id="clear" class="link-btn" title="Remove all chords">Clear</button>
+      </div>
+      <!-- One row per chord (renderSidebar): its color, name, notes and the pinned voicing's frets. -->
+      <div id="chords"></div>
+      <form id="add-form" class="add-row" autocomplete="off">
+        <input id="add-input" placeholder="Add chords: Dm7 G7 Cmaj7" aria-label="Add chords" spellcheck="false">
+        <button type="submit" class="icon-btn" title="Add (Enter)" aria-label="Add">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </form>
+
+      <div class="side-head">
+        <span class="side-title">Quick add</span>
+        <label class="key-pick">in <select id="key" aria-label="Key"></select></label>
+      </div>
+      <div id="presets" class="presets"></div>
+
+      <div class="spacer"></div>
+      <button id="open-settings" class="side-btn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Settings
+      </button>
+    </aside>
+
+    <main id="main">
+      <!-- What's voiced and how it's shown. It's also where the window is dragged (initTitleBar). -->
+      <header id="toolbar">
+        <!-- What's voiced. -->
+        <div class="tool-row">
+          <div id="drop" class="segmented" role="radiogroup" aria-label="Voicing">
+            <button role="radio" data-drop="drop2" title="Drop 2 (1)">Drop 2</button>
+            <button role="radio" data-drop="drop3" title="Drop 3 (2)">Drop 3</button>
+            <button role="radio" data-drop="drop24" title="Drop 2&amp;4 (3)">Drop 2&amp;4</button>
+          </div>
+          <div class="group">
+            <span class="group-label">Strings</span>
+            <div id="sets" class="chips"></div>
+          </div>
+          <div class="group">
+            <span class="group-label">Inversions</span>
+            <div id="inversions" class="chips">
+              <button class="chip" data-inversion="0" title="Root in the bass. Double-click to show only these.">Root</button>
+              <button class="chip" data-inversion="1" title="3rd in the bass. Double-click to show only these.">1st</button>
+              <button class="chip" data-inversion="2" title="5th in the bass. Double-click to show only these.">2nd</button>
+              <button class="chip" data-inversion="3" title="7th (or 6th) in the bass. Double-click to show only these.">3rd</button>
+            </div>
+          </div>
+        </div>
+        <!-- How it's shown. Below the first row when the window is too narrow for both. -->
+        <div class="tool-row">
+          <div id="labels" class="segmented" role="radiogroup" aria-label="Note labels">
+            <button role="radio" data-labels="intervals" title="Intervals on the dots (N)">Intervals</button>
+            <button role="radio" data-labels="notes" title="Note names on the dots (N)">Notes</button>
+          </div>
+          <div id="view" class="segmented" role="radiogroup" aria-label="View">
+            <button role="radio" data-view="stacked" title="A fretboard per chord, one under another (V)">Stacked</button>
+            <button role="radio" data-view="overlay" title="All chords on one fretboard (V)">Overlay</button>
+          </div>
+          <button id="leading" class="chip toggle" aria-pressed="false"
+                  title="Click a voicing and the other chords show their closest voicings on the same strings (L)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="16" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="14" r="2.2"/><path d="M6.4 14.3l4.2-4.6M13.9 9.2l3.3 3.4"/></svg>
+            Voice leading
+          </button>
+        </div>
+      </header>
+
+      <!-- The fretboards (renderBoards): fret numbers on top, then a board per chord, or one for all. -->
+      <div id="boards"></div>
+      <div id="empty" class="empty" hidden>
+        <p id="empty-text"></p>
+        <button id="empty-add" class="primary">Add ii–V–I in C</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Windows only (initTitleBar): the window has no system title bar, so the app draws its
+       buttons, with glyphs from the system's Segoe Fluent Icons / Segoe MDL2 Assets. -->
+  <div id="window-buttons" hidden>
+    <button id="win-min" title="Minimize" aria-label="Minimize" tabindex="-1">&#xE921;</button>
+    <button id="win-max" title="Maximize" aria-label="Maximize" tabindex="-1">&#xE922;</button>
+    <button id="win-close" title="Close" aria-label="Close" tabindex="-1">&#xE8BB;</button>
+  </div>
+
+  <div id="settings" class="overlay" hidden>
+    <div class="card" role="dialog" aria-labelledby="settings-title">
+      <button id="close-settings" class="icon-btn close" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <h2 id="settings-title">Settings</h2>
+
+      <section>
+        <h3>Appearance</h3>
+        <div id="theme" class="segmented" role="radiogroup" aria-label="Appearance">
+          <button role="radio" data-theme="system">System</button>
+          <button role="radio" data-theme="light">Light</button>
+          <button role="radio" data-theme="dark">Dark</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Fretboard</h3>
+        <div class="setting-row">
+          <span>Frets</span>
+          <div id="frets" class="segmented" role="radiogroup" aria-label="Frets"></div>
+        </div>
+        <label class="setting-row switch">
+          <span>Left-handed <small class="muted">The nut on the right</small></span>
+          <input id="left-handed" type="checkbox">
+        </label>
+        <label class="setting-row switch">
+          <span>Open strings <small class="muted">Voicings that use them, near the nut</small></span>
+          <input id="open-strings" type="checkbox">
+        </label>
+      </section>
+
+      <section id="about">
+        <p>Jazz Guitar Drop Helper <span id="app-version"></span></p>
+        <p>© 2026 Andrei Eliseev</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-action" hidden></button>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

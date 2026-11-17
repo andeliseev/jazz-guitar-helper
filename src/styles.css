@@ -1,0 +1,517 @@
+/* Same structure and tokens as Unified Mail: a sidebar with the progression and a main pane with
+   the fretboards. Light first; dark under prefers-color-scheme (which follows the window's theme
+   in the app) or data-theme="dark" (Settings → Appearance in a plain browser). */
+:root {
+  --bg: #ffffff;
+  --side: #f5f6f8;
+  --panel: #ffffff;
+  --border: #e4e6ea;
+  --text: #1d2026;
+  --muted: #6b7280;
+  --hover: #f1f3f6;
+  --selected: #fbeedc;
+  --accent: #b45309;
+  --accent-text: #ffffff;
+  --danger: #d93025;
+  --shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+  --toast-bg: #23272f;
+  --toast-text: #f2f4f7;
+  --toast-action: #f7b35a;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* The fretboard: light maple. */
+  --board: #f7f1e6;
+  --fret: #cbbfac;
+  --nut: #8a7f6c;
+  --string: #9a9184;
+  --inlay: #e7dcca;
+  --band: rgba(29, 32, 38, 0.06);
+  --dot-text: #ffffff;
+  /* Chord colors, by the chord's place in the progression (.c0 to .c7). */
+  --c0: #2f6df6;
+  --c1: #d93025;
+  --c2: #188038;
+  --c3: #9334e6;
+  --c4: #00897b;
+  --c5: #c2185b;
+  --c6: #8d6e3f;
+  --c7: #5f6368;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1c20;
+    --side: #141619;
+    --panel: #1a1c20;
+    --border: #2b2f36;
+    --text: #e6e8eb;
+    --muted: #9298a2;
+    --hover: #23262c;
+    --selected: #3b2b17;
+    --accent: #f5a524;
+    --accent-text: #1a1206;
+    --danger: #f2766b;
+    --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --toast-bg: #2b2f36;
+    /* Dark rosewood. */
+    --board: #26221d;
+    --fret: #4d463c;
+    --nut: #b9b0a0;
+    --string: #7d766b;
+    --inlay: #3a342c;
+    --band: rgba(230, 232, 235, 0.06);
+    --dot-text: #11141a;
+    --c0: #6b9bff;
+    --c1: #f47b70;
+    --c2: #4cc274;
+    --c3: #b98cff;
+    --c4: #38c2b0;
+    --c5: #f0709f;
+    --c6: #d6a865;
+    --c7: #a7adb6;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1c20;
+  --side: #141619;
+  --panel: #1a1c20;
+  --border: #2b2f36;
+  --text: #e6e8eb;
+  --muted: #9298a2;
+  --hover: #23262c;
+  --selected: #3b2b17;
+  --accent: #f5a524;
+  --accent-text: #1a1206;
+  --danger: #f2766b;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --toast-bg: #2b2f36;
+  --board: #26221d;
+  --fret: #4d463c;
+  --nut: #b9b0a0;
+  --string: #7d766b;
+  --inlay: #3a342c;
+  --band: rgba(230, 232, 235, 0.06);
+  --dot-text: #11141a;
+  --c0: #6b9bff;
+  --c1: #f47b70;
+  --c2: #4cc274;
+  --c3: #b98cff;
+  --c4: #38c2b0;
+  --c5: #f0709f;
+  --c6: #d6a865;
+  --c7: #a7adb6;
+  color-scheme: dark;
+}
+
+.c0 { --chord: var(--c0); }
+.c1 { --chord: var(--c1); }
+.c2 { --chord: var(--c2); }
+.c3 { --chord: var(--c3); }
+.c4 { --chord: var(--c4); }
+.c5 { --chord: var(--c5); }
+.c6 { --chord: var(--c6); }
+.c7 { --chord: var(--c7); }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 13.5px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: var(--hover); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+button svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+input:not([type="checkbox"]), select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+input:not([type="checkbox"]) { padding: 7px 10px; user-select: text; }
+input:not([type="checkbox"]):focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input::placeholder { color: var(--muted); }
+select { padding: 3px 6px; cursor: pointer; }
+
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+#app {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  /* Without an explicit row, a long list of fretboards would make the row as tall as the list,
+     and the main pane couldn't scroll. */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+}
+
+/* Sidebar */
+
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px 10px;
+  overflow-y: auto;
+  background: var(--side);
+  border-right: 1px solid var(--border);
+}
+/* The icon's tile starts 2/24 into the svg, so 2 px of padding puts it 14 px from the window's
+   edge, a little left of the macOS window buttons (18 px). */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 10px 2px;
+}
+.brand svg { width: 28px; height: 28px; flex: none; }
+.brand-name { display: flex; flex-direction: column; font-size: 17px; font-weight: 700; line-height: 1.1; }
+.brand-name small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The app's own title bar (initTitleBar). The brand reaches the top edge so all of it drags the
+   window. On macOS the system's window buttons sit above it, centered 26 px down on the row of the
+   toolbar (main.rs places them); in full screen the system hides them and the brand moves up. */
+.own-title-bar #sidebar { padding-top: 0; }
+.own-title-bar .brand { padding-top: 12px; }
+.mac .brand { padding-top: 46px; }
+.mac.full-screen .brand { padding-top: 12px; }
+/* Windows: the window buttons are on the toolbar's first row, at its right end. */
+.win #toolbar { padding-right: 156px; }
+#window-buttons { position: fixed; top: 0; right: 0; z-index: 40; display: flex; }
+#window-buttons button {
+  width: 46px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: 10px "Segoe Fluent Icons", "Segoe MDL2 Assets";
+  color: var(--text);
+}
+.inactive #window-buttons button { color: var(--muted); }
+#window-buttons button:hover { background: var(--hover); background: color-mix(in srgb, var(--text) 9%, transparent); }
+#window-buttons button:active { background: color-mix(in srgb, var(--text) 6%, transparent); }
+#window-buttons #win-close:hover { background: #c42b1c; color: #fff; }
+#window-buttons #win-close:active { background: #c83c30; color: #fff; }
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  margin: 12px 4px 4px 9px;
+}
+.side-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.link-btn { flex: none; padding: 2px 5px; border: 0; color: var(--muted); font-size: 12.5px; }
+.link-btn:hover { background: none; color: var(--text); }
+.key-pick { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; }
+
+/* A chord of the progression (chordItem). */
+#chords { display: flex; flex-direction: column; gap: 1px; }
+#chords:empty::after { content: "No chords yet."; padding: 4px 9px; color: var(--muted); }
+.chord-item { position: relative; padding: 6px 9px 7px; border-radius: 7px; }
+.chord-item:hover { background: var(--hover); }
+.item-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.chord-item .dot { flex: none; align-self: center; width: 9px; height: 9px; border-radius: 50%; background: var(--chord); }
+.chord-item .name { font-size: 14px; font-weight: 700; white-space: nowrap; cursor: text; }
+.chord-item .role { flex: none; color: var(--muted); font-size: 12px; }
+.chord-item .from { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
+.chord-item .notes, .chord-item .frets {
+  padding-left: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chord-item .frets { font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+.chord-item.off .item-head, .chord-item.off .notes { opacity: 0.45; }
+.name-edit { width: 130px; padding: 1px 6px !important; font-weight: 700 !important; }
+/* The row's buttons, over its right end under the mouse. */
+.item-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 1px;
+  padding-left: 6px;
+  border-radius: 6px;
+  background: inherit;
+}
+.chord-item:hover .item-actions, .chord-item:focus-within .item-actions { display: flex; }
+.item-actions button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px; color: var(--muted); }
+.item-actions button:hover { color: var(--text); background: var(--border); background: color-mix(in srgb, var(--text) 9%, transparent); }
+.item-actions button.danger:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.item-actions svg { width: 14px; height: 14px; }
+
+.add-row { display: flex; align-items: center; gap: 4px; margin: 6px 0 2px 4px; }
+.add-row input { flex: 1; min-width: 0; }
+.icon-btn { display: grid; place-items: center; padding: 6px; border: 0; }
+.add-row .icon-btn { color: var(--muted); }
+.add-row .icon-btn:hover { color: var(--text); }
+
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 2px 0 0 4px; }
+.presets button { padding: 5px 8px; border-radius: 999px; font-size: 12.5px; white-space: nowrap; }
+
+.spacer { flex: 1; min-height: 12px; }
+.side-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  text-align: left;
+  color: var(--muted);
+}
+.side-btn:hover { color: var(--text); }
+
+/* Toolbar */
+
+#main { display: flex; flex-direction: column; min-width: 0; background: var(--panel); }
+#toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 32px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.tool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.group { display: flex; align-items: center; gap: 8px; }
+.group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* A row of buttons where one is chosen. */
+.segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: 8px; }
+.segmented button { border: 0; border-radius: 6px; padding: 4px 12px; white-space: nowrap; }
+.segmented button[aria-checked="true"] { background: var(--selected); font-weight: 600; }
+
+/* Buttons that are on or off: string sets, inversions, voice leading. */
+.chips { display: flex; gap: 4px; }
+.chip { padding: 4px 10px; border-radius: 999px; font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] {
+  background: var(--selected);
+  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  font-weight: 600;
+}
+.chip.toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 10px; }
+.chip.toggle svg { width: 15px; height: 15px; color: var(--muted); }
+.chip.toggle[aria-pressed="true"] svg { color: var(--accent); }
+
+/* Fretboards */
+
+#boards {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0 18px 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* Fret numbers stay on top while the boards scroll under them. */
+.ruler { position: sticky; top: 0; z-index: 2; padding-top: 8px; background: var(--panel); }
+.ruler svg { display: block; }
+.fret-number { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+.fret-number.marked { fill: var(--text); font-weight: 600; }
+.fret-number.active { fill: var(--accent); font-weight: 700; }
+
+.row { padding: 10px 0 6px; }
+.row + .row { border-top: 1px solid var(--border); }
+.row-head { display: flex; align-items: baseline; gap: 9px; min-width: 0; padding: 0 2px 6px; }
+.row-head .dot, .legend-item .dot { flex: none; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--chord); }
+.row-name { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.row-notes { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.row-role { flex: none; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11.5px; line-height: 17px; }
+.row-info, .overlay-info { min-width: 0; color: var(--muted); font-size: 12.5px; }
+.row-info { margin-left: auto; padding-left: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-info b, .overlay-info b, .legend-item .frets { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.row-none { margin: 0 0 6px 2px; color: var(--muted); font-size: 12.5px; }
+
+.board { display: block; overflow: visible; }
+.board .wood { fill: var(--board); }
+.board .band { fill: var(--band); }
+.board .fret { stroke: var(--fret); stroke-width: 1.6; }
+.board .nut { fill: var(--nut); }
+.board .string { stroke: var(--string); }
+.board .inlay { fill: var(--inlay); }
+.board .string-name { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+
+/* A voicing: the line through its notes, and a wider invisible one to point at. */
+.shape {
+  fill: none;
+  stroke: var(--chord);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.38;
+  pointer-events: none;
+  transition: opacity 0.12s, stroke-width 0.12s;
+}
+.hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; cursor: pointer; }
+.dot { cursor: pointer; transition: opacity 0.12s; }
+.dot .mark { fill: var(--chord); stroke: var(--board); stroke-width: 1.5; }
+.dot text { fill: var(--dot-text); font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+/* Under the mouse (`on`) a voicing stands out and the board's others fade. A pinned one stays
+   strong, and the chord's other voicings dim (restyle). */
+.board.hovering .shape { opacity: 0.1; }
+.board.hovering .dot { opacity: 0.3; }
+.shape.dim { opacity: 0.07; }
+.dot.dim { opacity: 0.28; }
+.board .shape.pinned { opacity: 0.85; stroke-width: 4.5; }
+.board .dot.pinned { opacity: 1; }
+.dot.pinned .mark { stroke: var(--text); stroke-width: 2; }
+.board .shape.on { opacity: 0.95; stroke-width: 4.5; }
+.board .dot.on { opacity: 1; }
+
+.overlay-view { padding-top: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 2px 10px; }
+.legend-item { display: inline-flex; align-items: baseline; gap: 7px; }
+.legend-item b { font-size: 14px; }
+.legend-item .frets { font-size: 12px; }
+.overlay-info { min-height: 34px; padding: 10px 2px; }
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Settings */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 14, 22, 0.45);
+}
+.card {
+  position: relative;
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 22px 26px 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.card h2 { margin: 0 0 6px; font-size: 18px; }
+.card h3 { margin: 18px 0 6px; font-size: 14px; }
+.card .close { position: absolute; top: 14px; right: 14px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 0; }
+.setting-row small { display: block; font-size: 12px; }
+.switch { cursor: pointer; }
+.switch input {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.switch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(16px); }
+.switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#about { margin-top: 22px; color: var(--muted); font-size: 12.5px; }
+#about p { margin: 4px 0; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: min(640px, calc(100vw - 40px));
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border-radius: 9px;
+  background: var(--toast-bg);
+  color: var(--toast-text);
+  box-shadow: var(--shadow);
+  user-select: text;
+}
+#toast-text { white-space: pre-line; }
+#toast-action { flex: none; padding: 2px 4px; border: 0; color: var(--toast-action); font-weight: 700; }
+#toast-action:hover { background: rgba(255, 255, 255, 0.08); }

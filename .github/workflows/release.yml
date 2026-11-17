@@ -1,0 +1,206 @@
+# One-click release: Actions → Release → Run workflow.
+# Builds the Windows and/or macOS installers and publishes them as a GitHub Release. Needs no
+# secrets: the app isn't code-signed yet and has no updater (docs/todo.md).
+name: Release
+run-name: Release (${{ inputs.version || inputs.bump }}, ${{ inputs.platforms }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Raise the last released version: patch for fixes (1.2.3 → 1.2.4), minor for new features (→ 1.3.0), major (→ 2.0.0)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: Or enter an exact version instead, e.g. 0.2.0. Leave empty to use the choice above.
+        required: false
+        type: string
+      platforms:
+        description: Installers to build
+        type: choice
+        options: [Windows and macOS, Windows, macOS]
+        default: Windows and macOS
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      release_id: ${{ steps.release.outputs.id }}
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - name: Choose platforms
+        id: platforms
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          windows='{"name": "Windows", "os": "windows-latest", "args": "", "rust-targets": ""}'
+          # One universal .dmg for Apple Silicon and Intel Macs.
+          macos='{"name": "macOS", "os": "macos-latest", "args": "--target universal-apple-darwin", "rust-targets": "aarch64-apple-darwin,x86_64-apple-darwin"}'
+          case "$PLATFORMS" in
+            Windows) matrix="[$windows]" ;;
+            macOS) matrix="[$macos]" ;;
+            *) matrix="[$windows, $macos]" ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 20
+
+      - name: Run the theory tests
+        run: npm test
+
+      - name: Set version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
+        run: |
+          next=$(node scripts/next-version.mjs "$BUMP" "$EXACT")
+          echo "$next" >> "$GITHUB_OUTPUT"
+          version=$(echo "$next" | sed -n 's/^version=//p')
+          last=$(echo "$next" | sed -n 's/^last=//p')
+          # After a failed run package.json may already have this version.
+          if [ "$version" != "$(node -p "require('./package.json').version")" ]; then
+            node scripts/set-version.mjs "$version"
+          fi
+          # CHANGELOG.md's Unreleased notes become this version's; the version commit includes it.
+          node scripts/changelog.mjs "$version" > "$RUNNER_TEMP/notes.md"
+          if ! grep -q . "$RUNNER_TEMP/notes.md"; then
+            echo "::warning::CHANGELOG.md has nothing under Unreleased, so this release has no What's new."
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing **v$version** (last release: v$last)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit version change
+        id: commit
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          # Whoever started the release authors its commit, through their private
+          # noreply address: it counts as theirs, and no bot joins the contributors.
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "$ACTOR"
+            git config user.email "$ACTOR_ID+$ACTOR@users.noreply.github.com"
+            git commit -am "Release $TAG"
+            git push
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        id: release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          PLATFORMS: ${{ inputs.platforms }}
+          NOTES: ${{ runner.temp }}/notes.md
+        with:
+          script: |
+            const { TAG: tag, SHA: sha, PLATFORMS: platforms } = process.env;
+            const notes = require('fs').readFileSync(process.env.NOTES, 'utf8').trim();
+            // A draft left behind by a failed run is replaced.
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            for (const old of releases.filter((r) => r.draft && r.tag_name === tag)) {
+              await github.rest.repos.deleteRelease({ ...context.repo, release_id: old.id });
+            }
+            // Only mention the platforms this release has installers for.
+            const windows = platforms !== 'macOS';
+            const macos = platforms !== 'Windows';
+            const body = [
+              ...(notes ? ['## What\'s new', notes, ''] : []),
+              '## Download',
+              ...(windows ? ['- **Windows:** the `.exe` installer (or the `.msi`)'] : []),
+              ...(macos ? ['- **macOS** (Apple Silicon and Intel): the `.dmg`'] : []),
+              '',
+              'The app isn\'t verified by Microsoft or Apple yet, so the first launch shows a warning:',
+              ...(windows ? ['- **Windows:** "Windows protected your PC" → **More info** → **Run anyway**'] : []),
+              ...(macos ? ['- **macOS:** open the app once, then **System Settings → Privacy & Security → Open Anyway**'] : []),
+            ].join('\n');
+            const { data } = await github.rest.repos.createRelease({
+              ...context.repo,
+              tag_name: tag,
+              target_commitish: sha,
+              name: `Jazz Guitar Drop Helper ${tag}`,
+              body,
+              draft: true,
+            });
+            core.setOutput('id', data.id);
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        # The platforms chosen in the Prepare job.
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Every action is pinned to a commit, with its tag or branch in a comment, as in Unified Mail:
+      # a tag moved to other code mustn't change what runs here. To update one:
+      # gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          # Nothing in this job pushes, so the write token isn't left in .git/config for the build to read.
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          # Pinned to a commit, the action can't tell the toolchain from its ref.
+          toolchain: stable
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      # The Mac app gets an ad-hoc signature (bundle.macOS.signingIdentity "-" in tauri.conf.json),
+      # which Apple Silicon needs to run it at all.
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  # Publish only when every installer built, so a release is never half-empty.
+  publish:
+    name: Publish
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        with:
+          script: |
+            const { data } = await github.rest.repos.updateRelease({
+              ...context.repo,
+              release_id: Number(process.env.RELEASE_ID),
+              draft: false,
+              make_latest: 'true',
+            });
+            await core.summary.addRaw(`Published [${data.name}](${data.html_url})`, true).write();
