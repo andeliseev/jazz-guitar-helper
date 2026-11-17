@@ -8,9 +8,17 @@ import {
   TUNING,
   chordName,
   chordNotes,
+  chordScale,
   chordSymbol,
   chordTones,
+  defaultScale,
   fretText,
+  lengthName,
+  scaleChoices,
+  scaleName,
+  scaleNotes,
+  scaleOnNeck,
+  staffStep,
   inversionName,
   notesOnNeck,
   parseChord,
@@ -251,6 +259,63 @@ test('reads every note a chord symbol asks for', () => {
   assert.equal(chordSymbol(chord('Dm7')), 'Dm7');
   // All notes and Chord tones find every one of them on the neck: ♭9 of G7♯5♭9 is A♭.
   assert.ok(notesOnNeck(chord('G7#5b9')).some((n) => n.string === 1 && n.fret === 4 && n.tone.label === '♭9'));
+});
+
+test('offers scales to improvise over each chord', () => {
+  const notes = (text, scale) => {
+    const c = chord(text);
+    const all = scaleNotes(c, scale ?? chordScale(c));
+    return `${all.map((t) => t.name).join(' ')} / ${all.map((t) => t.label).join(' ')}`;
+  };
+  assert.equal(chordScale(chord('Dm7')), 'dorian');
+  // The chord's own notes keep their labels; the others are tensions above the octave.
+  assert.equal(notes('Dm7'), 'D E F G A B C / R 9 ♭3 11 5 13 ♭7');
+  assert.equal(chordScale(chord('G7')), 'mixolydian');
+  assert.equal(notes('G7', 'altered'), 'G A♭ A♯ B C♯ E♭ F / R ♭9 ♯9 3 ♯11 ♭13 ♭7');
+  assert.equal(notes('C7', 'blues'), 'C E♭ F G♭ G B♭ / R ♭3 11 ♭5 5 ♭7');
+  // Tensions written in a chord choose its scale, and keep the chord's names in it: D♯ is its ♯5.
+  assert.equal(chordScale(chord('G7#5b9')), 'altered');
+  assert.equal(notes('G7#5b9'), 'G A♭ A♯ B C♯ D♯ F / R ♭9 ♯9 3 ♯11 ♯5 ♭7');
+  assert.equal(chordScale(chord('G7alt')), 'altered');
+  assert.equal(chordScale(chord('G13b9')), 'halfWhole');
+  assert.equal(chordScale(chord('G7b9b13')), 'phrygianDominant');
+  assert.equal(chordScale(chord('G7#11')), 'lydianDominant');
+  assert.equal(chordScale(chord('Cmaj7#11')), 'lydian');
+  assert.equal(chordScale(chord('Bø9')), 'locrian2');
+  assert.equal(chordScale(chord('F♯ø')), 'locrian');
+  assert.equal(chordScale(chord('E°7')), 'wholeHalf');
+  // Every quality has scales, its default among them, each with every note once.
+  for (const quality of Object.keys(QUALITIES)) {
+    const c = { root: { letter: 0, acc: 0 }, quality };
+    assert.ok(scaleChoices(c).includes(defaultScale(c)), `${quality}'s default is offered`);
+    for (const s of scaleChoices(c)) {
+      const pcs = scaleNotes(c, s).map((t) => t.pc);
+      assert.equal(new Set(pcs).size, pcs.length, `${quality} ${s} has each note once`);
+    }
+  }
+  // A scale chosen for another chord gives way to the default.
+  assert.equal(chordScale({ ...chord('Dm7'), scale: 'altered' }), 'dorian');
+  assert.equal(chordScale({ ...chord('G7'), scale: 'altered' }), 'altered');
+  // Ready-made progressions bring their scales and lengths.
+  const [iii, VI] = presetChords('iii-VI-ii-V', 'C');
+  assert.equal(scaleName(iii, chordScale(iii)), 'E Phrygian');
+  assert.equal(scaleName(VI, chordScale(VI)), 'A Phrygian dominant');
+  assert.deepEqual(presetChords('ii-V-I', 'C').map((c) => c.beats), [4, 4, 8]);
+  assert.deepEqual([2, 4, 8].map(lengthName), ['½ bar', '1 bar', '2 bars']);
+  // On the neck: D Dorian on the high E string.
+  const onHighE = scaleOnNeck(chord('Dm7'), 'dorian', { frets: 12 }).filter((n) => n.string === 1);
+  assert.deepEqual(onHighE.map((n) => n.fret), [0, 1, 3, 5, 7, 8, 10, 12]); // E F G A B C D E
+});
+
+test('places notes on the staff', () => {
+  // Steps of the scale from C0: C4 is 28, E4 (the treble staff's bottom line) 30, B4 34.
+  const [c, e, b] = chordTones(chord('Cmaj7')).filter((t) => [0, 4, 11].includes(t.pc));
+  assert.equal(staffStep(c, 60), 28);
+  assert.equal(staffStep(e, 64), 30);
+  assert.equal(staffStep(b, 71), 34);
+  // Spelled notes sit on their own letter: B♯3 (MIDI 60) is a step under C4, C♭5 (71) a step over B4.
+  assert.equal(staffStep({ letter: 6, acc: 1 }, 60), 27);
+  assert.equal(staffStep({ letter: 0, acc: -1 }, 71), 35);
 });
 
 test('stays within the frets shown', () => {

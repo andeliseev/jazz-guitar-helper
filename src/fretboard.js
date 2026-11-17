@@ -41,7 +41,7 @@ export function geometry(width, frets, { gap = 22, leftHanded = false, numbers =
     gap,
     top,
     numbers,
-    height: top * 2 + gap * 5 + (numbers ? NUMBERS_HEIGHT : 0),
+    height: boardHeight(gap, numbers),
     leftHanded,
     flip,
     stringY: (string) => top + (string - 1) * gap,
@@ -65,6 +65,11 @@ export function geometry(width, frets, { gap = 22, leftHanded = false, numbers =
       return { x: r1(Math.min(a, b)), width: r1(Math.abs(b - a)) };
     },
   };
+}
+
+/** How tall a board is with `gap` px between strings, and fret numbers under it with `numbers`. */
+export function boardHeight(gap, numbers) {
+  return Math.round(gap * 0.8) * 2 + gap * 5 + (numbers ? NUMBERS_HEIGHT : 0);
 }
 
 /**

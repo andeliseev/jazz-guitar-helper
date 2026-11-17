@@ -278,6 +278,11 @@ select { padding: 3px 6px; cursor: pointer; }
   font-size: 12px;
 }
 .chord-item .frets { font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+.chord-item .notes { display: flex; align-items: center; gap: 8px; }
+.note-names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A chord's length, at the end of its notes' line: plain text until the mouse is on it. */
+.chord-item .length { flex: none; height: 20px; padding: 0 2px; border-color: transparent; background: none; color: var(--muted); font-size: 11.5px; }
+.chord-item .length:hover, .chord-item .length:focus-visible { border-color: var(--border); color: var(--text); }
 .chord-item.off .item-head, .chord-item.off .notes { opacity: 0.45; }
 .name-edit { width: 130px; padding: 1px 6px !important; font-weight: 700 !important; }
 /* The row's buttons, over its right end under the mouse. */
@@ -421,6 +426,9 @@ select { padding: 3px 6px; cursor: pointer; }
 .chip.toggle[aria-pressed="true"] svg { color: var(--accent); }
 .height-pick { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .height-pick input { width: 110px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+/* While Follow sizes the boards (renderPlayer), Height and Fit wait, dimmed. */
+.height-pick.off { opacity: 0.45; pointer-events: none; }
+#fit { margin-left: -10px; }
 
 /* Fretboards */
 
@@ -499,6 +507,82 @@ select { padding: 3px 6px; cursor: pointer; }
 .legend-item b { font-size: 14px; }
 .legend-item .frets { font-size: 12px; }
 .overlay-info { min-height: 34px; padding: 10px 2px; }
+
+/* Scales on (scalePicker): the chord's scale by name, then its notes. */
+.scale-pick { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; }
+.scale-pick select { padding: 1px 4px; font-size: 12.5px; }
+.scale-notes { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+
+/* The staff (renderStaff, staff.js), under the toolbar: it scrolls sideways when the bars don't fit. */
+#staff { flex: none; padding: 8px 18px 4px; border-bottom: 1px solid var(--border); }
+.staff-head { display: flex; align-items: center; gap: 12px; }
+.segmented.small button { padding: 1px 10px; font-size: 12px; }
+#staff-scroll { overflow-x: auto; overflow-y: hidden; }
+#staff-svg { display: block; }
+.staff-line, .bar-line, .ledger { stroke: var(--muted); stroke-width: 1; }
+.bar-line.end { stroke-width: 3; }
+.clef, .clef-8 { fill: var(--text); }
+.clef { font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Music", serif; }
+.clef-8 { font-size: 10px; text-anchor: middle; }
+.time { fill: var(--text); font: 700 18px Georgia, "Times New Roman", serif; text-anchor: middle; dominant-baseline: central; }
+.staff-symbol { fill: var(--chord); font-size: 13px; font-weight: 700; }
+.head { fill: none; stroke: var(--text); stroke-width: 1.5; }
+.head.filled { fill: var(--text); }
+.stem { stroke: var(--text); stroke-width: 1.2; }
+.tie { fill: var(--text); stroke: var(--text); stroke-width: 0.4; }
+.accidental { fill: var(--text); font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+/* A chord with no voicing pinned shows its notes, in grey: they aren't a voicing. */
+.staff-notes.muted .head, .staff-notes.muted .stem, .staff-notes.muted .tie { stroke: var(--muted); }
+.staff-notes.muted .tie { fill: var(--muted); }
+.staff-notes.muted .head.filled, .staff-notes.muted .accidental { fill: var(--muted); }
+.staff-now { fill: var(--selected); }
+.staff-playhead { stroke: var(--accent); stroke-width: 2; }
+
+/* The metronome (player), under the boards. */
+#player { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 18px; border-top: 1px solid var(--border); }
+#play { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px 4px 10px; }
+#play svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+#play .icon-stop, #play[aria-pressed="true"] .icon-play { display: none; }
+#play[aria-pressed="true"] .icon-stop { display: inline; }
+#play[aria-pressed="true"] { background: var(--selected); color: var(--accent); }
+.tempo { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.tempo input { width: 96px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.tempo output { display: inline-block; min-width: 3ch; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+#beats { display: flex; gap: 6px; }
+#beats i { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+#beats i.on { background: var(--accent); }
+/* The chords' sound: a button naming it, and a card over the bar until a click elsewhere or Esc. */
+.sound-pick { position: relative; }
+.sound-card {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 300px;
+  padding: 12px 14px 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.sound-card[hidden] { display: none; }
+.sound-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.sound-list button { padding: 3px 10px; border-radius: 999px; font-size: 12.5px; }
+.sound-list button[aria-checked="true"] { background: var(--selected); color: var(--accent); }
+.sound-row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.sound-row span { width: 56px; }
+.sound-row input { flex: 1; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.sound-card .setting-row { padding: 2px 0 4px; font-size: 13px; }
+/* As wide when it says nothing as when it names a chord, so the bar doesn't move as it plays. */
+#play-status { min-width: 150px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+#staff-toggle { margin-left: auto; }
+/* While playing (markPlaying): the chord sounding stands out, the others rest. */
+.chord-item.playing { background: var(--selected); }
+.row.resting { opacity: 0.35; }
+.overlay-view .board .resting { opacity: 0.15; }
 
 .empty {
   flex: 1;

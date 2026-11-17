@@ -1,6 +1,6 @@
 // Renders the README's screenshots, docs/images/screenshot-light.png and screenshot-dark.png, from
 // src/ in headless Edge or Chrome: the ii–V–I in C with a voice-led path pinned in the middle of
-// the neck, and two progressions under My presets. Run from the repo root after a visible UI change:
+// the neck, on the staff too, and two progressions under My presets. Run from the repo root after a visible UI change:
 //   node scripts/screenshots.mjs
 // Needs Node 22+ (or Node 21 with --experimental-websocket). Set BROWSER to the browser's path if
 // it isn't found.
@@ -17,6 +17,7 @@ const DEBUG_PORT = 9339;
 const chord = (letter, acc, quality, role) => ({ root: { letter, acc }, quality, role });
 const STATE = {
   leading: true,
+  staff: true,
   anchor: 1,
   pins: { 1: 'drop2.4321.10-10-10-10' },
   saved: [

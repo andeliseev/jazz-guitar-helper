@@ -53,13 +53,78 @@ export const KEYS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A
 const MINOR_KEYS = { 'D♭': 'C♯', 'A♭': 'G♯' };
 const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
 
-// Ready-made progressions: [scale degree, quality, roman numeral] per chord.
+// Ready-made progressions: [scale degree, quality, roman numeral, beats, scale] per chord. The scale
+// is the usual one for the chord's place in the key (Phrygian for a iii, Aeolian for a vi).
 export const PRESETS = [
-  { id: 'ii-V-I', name: 'ii–V–I', chords: [[2, 'm7', 'ii'], [5, 'dom7', 'V'], [1, 'maj7', 'I']] },
-  { id: 'ii-V-i', name: 'ii–V–i', minor: true, chords: [[2, 'm7b5', 'iiø'], [5, 'dom7', 'V'], [1, 'm6', 'i']] },
-  { id: 'I-vi-ii-V', name: 'I–vi–ii–V', chords: [[1, 'maj7', 'I'], [6, 'm7', 'vi'], [2, 'm7', 'ii'], [5, 'dom7', 'V']] },
-  { id: 'iii-VI-ii-V', name: 'iii–VI–ii–V', chords: [[3, 'm7', 'iii'], [6, 'dom7', 'VI'], [2, 'm7', 'ii'], [5, 'dom7', 'V']] },
+  { id: 'ii-V-I', name: 'ii–V–I', chords: [[2, 'm7', 'ii', 4, 'dorian'], [5, 'dom7', 'V', 4, 'mixolydian'], [1, 'maj7', 'I', 8, 'ionian']] },
+  {
+    id: 'ii-V-i',
+    name: 'ii–V–i',
+    minor: true,
+    chords: [[2, 'm7b5', 'iiø', 4, 'locrian'], [5, 'dom7', 'V', 4, 'phrygianDominant'], [1, 'm6', 'i', 8, 'melodicMinor']],
+  },
+  {
+    id: 'I-vi-ii-V',
+    name: 'I–vi–ii–V',
+    chords: [[1, 'maj7', 'I', 4, 'ionian'], [6, 'm7', 'vi', 4, 'aeolian'], [2, 'm7', 'ii', 4, 'dorian'], [5, 'dom7', 'V', 4, 'mixolydian']],
+  },
+  {
+    id: 'iii-VI-ii-V',
+    name: 'iii–VI–ii–V',
+    chords: [[3, 'm7', 'iii', 4, 'phrygian'], [6, 'dom7', 'VI', 4, 'phrygianDominant'], [2, 'm7', 'ii', 4, 'dorian'], [5, 'dom7', 'V', 4, 'mixolydian']],
+  },
 ];
+
+// How long a chord lasts, in beats of 4/4: half a bar to four bars.
+export const LENGTHS = [2, 4, 8, 12, 16];
+export const DEFAULT_BEATS = 4;
+
+/** "½ bar", "1 bar", "2 bars". */
+export function lengthName(beats) {
+  return beats === 2 ? '½ bar' : `${beats / 4} bar${beats === 4 ? '' : 's'}`;
+}
+
+// Scales to improvise over a chord, as [interval number, semitones] from its root. Modes have their
+// proper names; the others are written lower case after the root: "G altered".
+export const SCALES = {
+  ionian: { name: 'Ionian', steps: [[1, 0], [2, 2], [3, 4], [4, 5], [5, 7], [6, 9], [7, 11]] },
+  dorian: { name: 'Dorian', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 7], [6, 9], [7, 10]] },
+  phrygian: { name: 'Phrygian', steps: [[1, 0], [2, 1], [3, 3], [4, 5], [5, 7], [6, 8], [7, 10]] },
+  lydian: { name: 'Lydian', steps: [[1, 0], [2, 2], [3, 4], [4, 6], [5, 7], [6, 9], [7, 11]] },
+  mixolydian: { name: 'Mixolydian', steps: [[1, 0], [2, 2], [3, 4], [4, 5], [5, 7], [6, 9], [7, 10]] },
+  aeolian: { name: 'Aeolian', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 7], [6, 8], [7, 10]] },
+  locrian: { name: 'Locrian', steps: [[1, 0], [2, 1], [3, 3], [4, 5], [5, 6], [6, 8], [7, 10]] },
+  locrian2: { name: 'Locrian ♮2', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 6], [6, 8], [7, 10]] },
+  melodicMinor: { name: 'melodic minor', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 7], [6, 9], [7, 11]] },
+  harmonicMinor: { name: 'harmonic minor', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 7], [6, 8], [7, 11]] },
+  lydianAugmented: { name: 'Lydian augmented', steps: [[1, 0], [2, 2], [3, 4], [4, 6], [5, 8], [6, 9], [7, 11]] },
+  lydianDominant: { name: 'Lydian dominant', steps: [[1, 0], [2, 2], [3, 4], [4, 6], [5, 7], [6, 9], [7, 10]] },
+  mixolydianFlat13: { name: 'Mixolydian ♭13', steps: [[1, 0], [2, 2], [3, 4], [4, 5], [5, 7], [6, 8], [7, 10]] },
+  phrygianDominant: { name: 'Phrygian dominant', steps: [[1, 0], [2, 1], [3, 4], [4, 5], [5, 7], [6, 8], [7, 10]] },
+  altered: { name: 'altered', steps: [[1, 0], [2, 1], [2, 3], [3, 4], [4, 6], [6, 8], [7, 10]] },
+  halfWhole: { name: 'half-whole diminished', steps: [[1, 0], [2, 1], [2, 3], [3, 4], [4, 6], [5, 7], [6, 9], [7, 10]] },
+  wholeHalf: { name: 'whole-half diminished', steps: [[1, 0], [2, 2], [3, 3], [4, 5], [5, 6], [6, 8], [7, 9], [7, 11]] },
+  wholeTone: { name: 'whole tone', steps: [[1, 0], [2, 2], [3, 4], [4, 6], [5, 8], [7, 10]] },
+  majorPentatonic: { name: 'major pentatonic', steps: [[1, 0], [2, 2], [3, 4], [5, 7], [6, 9]] },
+  minorPentatonic: { name: 'minor pentatonic', steps: [[1, 0], [3, 3], [4, 5], [5, 7], [7, 10]] },
+  blues: { name: 'blues', steps: [[1, 0], [3, 3], [4, 5], [5, 6], [5, 7], [7, 10]] },
+};
+
+// The scales offered for each quality, the usual first.
+const SCALE_CHOICES = {
+  maj7: ['ionian', 'lydian', 'majorPentatonic'],
+  maj6: ['ionian', 'lydian', 'majorPentatonic'],
+  m7: ['dorian', 'aeolian', 'phrygian', 'minorPentatonic', 'blues'],
+  m6: ['dorian', 'melodicMinor', 'minorPentatonic'],
+  mMaj7: ['melodicMinor', 'harmonicMinor'],
+  m7b5: ['locrian', 'locrian2'],
+  dim7: ['wholeHalf'],
+  dom7: ['mixolydian', 'lydianDominant', 'mixolydianFlat13', 'phrygianDominant', 'altered', 'halfWhole', 'wholeTone', 'blues'],
+  sus4: ['mixolydian', 'phrygian'],
+  dom7b5: ['wholeTone', 'lydianDominant', 'altered'],
+  aug7: ['wholeTone', 'altered'],
+  augMaj7: ['lydianAugmented'],
+};
 
 // Note names
 
@@ -67,16 +132,31 @@ function accidental(acc) {
   return acc < 0 ? '♭'.repeat(-acc) : '♯'.repeat(acc);
 }
 
+/**
+ * A note as players call it: double flats and sharps read as the note they sound as (B♭♭ is A).
+ * { letter, acc }.
+ */
+function plain(letter, acc) {
+  if (Math.abs(acc) <= 1) return { letter, acc };
+  const pc = mod(NATURAL[letter] + acc, 12);
+  const natural = NATURAL.indexOf(pc);
+  if (natural >= 0) return { letter: natural, acc: 0 };
+  return acc < 0 ? { letter: NATURAL.indexOf(pc + 1), acc: -1 } : { letter: NATURAL.indexOf(pc - 1), acc: 1 };
+}
+
 /** A note's name from its letter (0 = C) and accidental (-1 = flat, 1 = sharp). */
 export function noteName(letter, acc) {
-  // Double flats and sharps read as the note they sound as (B♭♭ → A), as players call them.
-  if (Math.abs(acc) > 1) {
-    const pc = mod(NATURAL[letter] + acc, 12);
-    const natural = NATURAL.indexOf(pc);
-    if (natural >= 0) return LETTERS[natural];
-    return acc < 0 ? `${LETTERS[NATURAL.indexOf(pc + 1)]}♭` : `${LETTERS[NATURAL.indexOf(pc - 1)]}♯`;
-  }
-  return LETTERS[letter] + accidental(acc);
+  const note = plain(letter, acc);
+  return LETTERS[note.letter] + accidental(note.acc);
+}
+
+/**
+ * Where a note is on the staff, in steps of the scale (each line and space one): its octave times 7
+ * plus its letter, for the note `tone` (a { letter, acc }) sounding at `midi`. C4 is 28.
+ */
+export function staffStep(tone, midi) {
+  const octave = Math.round((midi - tone.acc - NATURAL[tone.letter]) / 12) - 1;
+  return octave * 7 + tone.letter;
 }
 
 /** "♭3", "5", "♭♭7": an interval by its number and size; the root is "R". */
@@ -102,10 +182,11 @@ export function chordName(chord) {
   return rootName(chord.root) + QUALITIES[chord.quality].suffix;
 }
 
-/** A tone of a chord on `root`: pitch class, interval label and spelled name. */
+/** A tone of a chord on `root`: pitch class, interval label, and its spelled name, letter and accidental. */
 function toneOf(root, deg, semis, index) {
   const note = spell(root, deg, semis);
-  return { index, deg, semis, pc: note.pc, label: intervalLabel(deg, semis), name: noteName(note.letter, note.acc) };
+  const { letter, acc } = plain(note.letter, note.acc);
+  return { index, deg, semis, pc: note.pc, label: intervalLabel(deg, semis), name: LETTERS[letter] + accidental(acc), letter, acc };
 }
 
 /** The four tones the chord is voiced with, in its own order (root, 3rd, 5th, 7th or 6th). */
@@ -198,8 +279,17 @@ export function voicings(chord, drop, set, { frets = 15, openStrings = true } = 
 }
 
 /** Every place on the neck within `frets` frets where one of the chord's notes is, on every string. */
-export function notesOnNeck(chord, { frets = 15, openStrings = true } = {}) {
-  const tones = new Map(chordNotes(chord).map((t) => [t.pc, t]));
+export function notesOnNeck(chord, options) {
+  return onNeck(chordNotes(chord), options);
+}
+
+/** Every place on the neck where one of the notes of `scale` (a key of SCALES) over `chord` is. */
+export function scaleOnNeck(chord, scale, options) {
+  return onNeck(scaleNotes(chord, scale), options);
+}
+
+function onNeck(notes, { frets = 15, openStrings = true } = {}) {
+  const tones = new Map(notes.map((t) => [t.pc, t]));
   const found = [];
   for (let string = 1; string <= 6; string++) {
     for (let fret = openStrings ? 0 : 1; fret <= frets; fret++) {
@@ -526,18 +616,83 @@ export function suggestChords(token, limit = 12) {
   return found.slice(0, limit);
 }
 
+// Scales over chords
+
+/** The scales offered for a chord, as keys of SCALES, the usual one first. */
+export function scaleChoices(chord) {
+  return SCALE_CHOICES[chord.quality];
+}
+
+/**
+ * The scale to improvise over a chord unless one is chosen: the usual one for its quality, or for
+ * the tensions written in it (altered for G7♯5♭9, half-whole diminished for G13♭9, Lydian for
+ * Cmaj7♯11).
+ */
+export function defaultScale(chord) {
+  const m = chord.approx && chord.text ? SYMBOL.exec(chord.text.trim()) : null;
+  const s = m ? normalize(m[3]).s : '';
+  const has = (re) => re.test(s);
+  switch (chord.quality) {
+    case 'maj7':
+    case 'maj6':
+      return has(/#11/) ? 'lydian' : 'ionian';
+    case 'm7b5':
+      return has(/(^|[^b#+-])9|11/) ? 'locrian2' : 'locrian';
+    case 'sus4':
+      return has(/b9/) ? 'phrygian' : 'mixolydian';
+    case 'aug7':
+      return has(/b9|#9|alt/) ? 'altered' : 'wholeTone';
+    case 'dom7':
+      if (has(/alt/) || (has(/#9/) && has(/b9|b13|#11/))) return 'altered';
+      if (has(/b9/) && has(/b13/)) return 'phrygianDominant';
+      if (has(/[b#]9/)) return 'halfWhole';
+      if (has(/#11/)) return 'lydianDominant';
+      if (has(/b13/)) return 'mixolydianFlat13';
+      return 'mixolydian';
+    default:
+      return SCALE_CHOICES[chord.quality][0];
+  }
+}
+
+/** The chord's scale: the one chosen for it if it's still one of its choices, else its default. */
+export function chordScale(chord) {
+  return scaleChoices(chord).includes(chord.scale) ? chord.scale : defaultScale(chord);
+}
+
+/** "D Dorian", "G altered". */
+export function scaleName(chord, scale) {
+  return `${rootName(chord.root)} ${SCALES[scale].name}`;
+}
+
+/**
+ * The notes of `scale` over `chord`, low to high from the root, as chordNotes() gives tones: a note
+ * of the chord keeps its name and label (G7♯5♭9's D♯ stays ♯5), the others are named as tensions
+ * above the octave (9, 11, 13).
+ */
+export function scaleNotes(chord, scale) {
+  const own = new Map(chordNotes(chord).map((t) => [t.pc, t]));
+  const rootPc = mod(NATURAL[chord.root.letter] + chord.root.acc, 12);
+  return SCALES[scale].steps.map(([deg, semis], index) => {
+    const tone = own.get(mod(rootPc + semis, 12));
+    if (tone) return { ...tone, index, semis: mod(tone.semis, 12) };
+    const t = toneOf(chord.root, deg, semis, index);
+    const above = { 2: 9, 4: 11, 6: 13 }[deg];
+    return above ? { ...t, label: intervalLabel(above, semis + 12) } : t;
+  });
+}
+
 /** The key a ready-made progression is in: "C", or "C♯ minor" for a minor one in D♭. */
 export function presetKey(id, key) {
   const preset = PRESETS.find((p) => p.id === id);
   return preset.minor ? `${MINOR_KEYS[key] || key} minor` : key;
 }
 
-/** The chords of a ready-made progression in `key` (one of KEYS), with their roman numerals. */
+/** The chords of a ready-made progression in `key` (one of KEYS), with their roman numerals, lengths and scales. */
 export function presetChords(id, key) {
   const preset = PRESETS.find((p) => p.id === id);
   const tonic = parseRoot((preset.minor && MINOR_KEYS[key]) || key);
-  return preset.chords.map(([deg, quality, role]) => {
+  return preset.chords.map(([deg, quality, role, beats, scale]) => {
     const { letter, acc } = spell(tonic, deg, MAJOR_SCALE[deg - 1]);
-    return { root: { letter, acc }, quality, role };
+    return { root: { letter, acc }, quality, role, beats, scale };
   });
 }

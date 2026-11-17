@@ -121,15 +121,31 @@ A chord is voiced as one of the twelve four-note qualities, but has all the note
 
 `chordSymbol(chord)` names a chord as written: what was typed, with `♭` and `♯` for `b`, `#`, `-` and `+` before a number, `–` for a leading `-`, and `Δ` for `^` (`Bb-9` is B♭–9). A chord voiced as written keeps its own name (`chordName`).
 
+## Scales over chords
+
+`SCALES` holds the scales to improvise over a chord, each as [interval number, semitones] from the root: the seven modes, Locrian ♮2, melodic and harmonic minor, Lydian augmented, Lydian dominant, Mixolydian ♭13, Phrygian dominant, altered, half-whole and whole-half diminished, whole tone, major and minor pentatonic, blues. Modes keep their proper names; the others are lower case after the root ("G altered").
+
+`scaleChoices(chord)` offers the ones that fit its quality, the usual first: Ionian, Lydian or major pentatonic for a major 7th or 6th; Dorian, Aeolian, Phrygian, minor pentatonic or blues for a minor 7th; Mixolydian, Lydian dominant, Mixolydian ♭13, Phrygian dominant, altered, half-whole diminished, whole tone or blues for a dominant 7th; Locrian or Locrian ♮2 for a half-diminished; whole-half diminished for a diminished 7th; and so on.
+
+`defaultScale(chord)` is the first, unless tensions written in the chord say otherwise: `7alt`, or a ♯9 with another altered tension, is altered; ♭9 with ♭13 Phrygian dominant; another ♭9 or ♯9 half-whole diminished; ♯11 Lydian dominant (Lydian on a major chord); ♭13 Mixolydian ♭13; a 7♯5 with ♭9 or ♯9 altered, without them whole tone; a half-diminished with a 9th (`Bø9`) Locrian ♮2. `chordScale(chord)` is the chord's own `scale` while it's one of its choices, else the default. Ready-made progressions give each chord the scale for its place in the key: Dorian for a ii, Mixolydian for a V, Ionian for a I, Phrygian for a iii, Aeolian for a vi, Locrian for a iiø, Phrygian dominant for the V of a minor key and for a VI7, melodic minor for a minor i.
+
+`scaleNotes(chord, scale)` spells the scale from the chord's root, low to high. A note that's also the chord's keeps the chord's name and label (G7♯5♭9's D♯ is its ♯5, though the altered scale would call it E♭); the others are named as tensions above the octave: 9, 11 and 13, altered as written (♭9, ♯9, ♯11, ♭13). `scaleOnNeck` finds them on the neck, as `notesOnNeck` does a chord's notes.
+
+## Lengths
+
+A chord lasts `beats` of 4/4, one of `LENGTHS`: 2, 4, 8, 12 or 16, half a bar to four bars (`lengthName`: "½ bar", "1 bar", "2 bars"). A new chord lasts a bar (`DEFAULT_BEATS`); a ready-made progression says each chord's (`PRESETS`: the I of ii–V–I lasts two bars).
+
+`staffStep(tone, midi)` places a spelled note on the staff, in steps of the scale (each line and each space one): octave × 7 + letter, C4 being 28. It goes by the note's letter, so B♯3 is a step under C4 though it sounds as C4; `toneOf` gives every tone its `letter` and `acc` for it, double accidentals already read as the note they sound as (B♭♭ as A).
+
 ## Ready-made progressions
 
-`PRESETS` are written as scale degrees, qualities and roman numerals, and `presetChords(id, key)` spells them in a key from `KEYS`:
+`PRESETS` are written as scale degrees, qualities, roman numerals, lengths and scales, and `presetChords(id, key)` spells them in a key from `KEYS`:
 
-| Progression | Chords | In C |
-| --- | --- | --- |
-| ii–V–I | ii m7, V 7, I maj7 | Dm7 G7 Cmaj7 |
-| ii–V–i | iiø m7♭5, V 7, i m6 | Dm7♭5 G7 Cm6 |
-| I–vi–ii–V | I maj7, vi m7, ii m7, V 7 | Cmaj7 Am7 Dm7 G7 |
-| iii–VI–ii–V | iii m7, VI 7, ii m7, V 7 | Em7 A7 Dm7 G7 |
+| Progression | Chords | In C | Bars | Scales |
+| --- | --- | --- | --- | --- |
+| ii–V–I | ii m7, V 7, I maj7 | Dm7 G7 Cmaj7 | 1 1 2 | Dorian, Mixolydian, Ionian |
+| ii–V–i | iiø m7♭5, V 7, i m6 | Dm7♭5 G7 Cm6 | 1 1 2 | Locrian, Phrygian dominant, melodic minor |
+| I–vi–ii–V | I maj7, vi m7, ii m7, V 7 | Cmaj7 Am7 Dm7 G7 | 1 1 1 1 | Ionian, Aeolian, Dorian, Mixolydian |
+| iii–VI–ii–V | iii m7, VI 7, ii m7, V 7 | Em7 A7 Dm7 G7 | 1 1 1 1 | Phrygian, Phrygian dominant, Dorian, Mixolydian |
 
 The keys are named as in jazz charts (D♭, E♭, F♯, A♭, B♭). A minor progression in D♭ or A♭ goes to C♯ or G♯ minor, the names those keys have (`presetKey`).

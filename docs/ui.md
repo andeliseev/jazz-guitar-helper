@@ -16,7 +16,9 @@ Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTau
 
 - **Sidebar:** the brand, **Progression** (Save and Clear in its heading, a row per chord, then **Add chords** with its suggestions), **Presets** (a key and the ready-made progressions), **My presets** (the progressions saved), and Settings at the bottom. It scrolls when the progression is long.
 - **Toolbar:** two rows. The first chooses what the boards show: a drop type or Chord tones (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Frets (a select: 12, 15, the default, 17, 20, 22 or 24) and Height (a slider). When the pane is wide enough, the second row sits beside the first.
+- **Staff** (`#staff`, when Staff is on): under the toolbar, the progression's bars (see [Staff](#staff)).
 - **Fretboards** (`#boards`): fret numbers on top, sticky while the boards scroll, then a board per chord (Stacked) or one board for all (Overlay). With no chord to show, an empty state says why, with a button that adds a ii–V–I.
+- **Player** (`#player`): along the bottom, the metronome: Play, Tempo, Count-in, Loop, Click, Follow, the chords' sound, the beat, what's playing, and the Staff switch (see [Playing](#playing)).
 
 The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width, and a new width redraws them (`ResizeObserver`). How tall they are is the user's choice (see [Height](#height)).
 
@@ -68,6 +70,36 @@ What only voicings use (Strings, Inversions, Voice leading, All notes) stays whe
 
 The Height slider sets the gap between strings, 16 to 44 px, which is how tall the boards are. Each view keeps its own (`state.ui.heights`): 20 px for Stacked and 32 px for Overlay at first, since one board for all the chords can be taller. The boards follow the slider as it moves, redrawn at most once a frame, and the value is saved like the rest of the state. A double-click on the slider goes back to the view's first height.
 
+**Fit** (`fitHeight`) sets it once: the tallest gap at which every board drawn shows in the pane without scrolling (`fittedGap`, measured on what's drawn: headings, fret numbers and legend stay, only the boards grow), from 44 px down to 16. With too many chords to fit even at 16 px, it stays there and the rest scroll. The slider follows, and the height is saved like a slider's.
+
+### Scales
+
+**Scales** (`state.ui.scales`, key `S`) outlines each chord's scale on its board (`scaleOnNeck`, see [theory.md](theory.md#scales-over-chords)), as All notes outlines the chord's notes: added to the layer's `extras`, so a spot that's already the chord's (a voicing's note, or a Chord tones dot) keeps its look. The labels are the scale's own: the chord's notes as the chord names them, the others as tensions (9, 11, 13, ♭9, ♯11). Scales works with voicings and in Chord tones.
+
+Each board's heading (Stacked) and each legend item (Overlay) gets a picker (`scalePicker`): the scales offered for the chord (`scaleChoices`) by name, "D Dorian", then the chosen scale's notes. The choice is the chord's `scale`; without one, or with one that doesn't fit after the chord is changed, the chord has its default (`chordScale`). Ready-made progressions set it for each chord.
+
+## Staff
+
+**Staff** (`state.ui.staff`, in the player bar) shows the progression above the boards, drawn by `staff.js` as one SVG: a treble clef with an 8 under it (guitar music is written an octave above how it sounds), 4/4, a bar line every four beats and a double bar at the end. Each chord's symbol, in its color, starts its span, which is as wide as its length (`chord.beats`): bars share the pane's width, but a beat is never under 32 px, so a long progression scrolls sideways (`#staff-scroll`), and a scale's notes get room enough.
+
+What each chord holds (`staffEntries`), chosen above the staff (`staffShows`):
+
+- **Chords:** its pinned voicing, the pitches it sounds an octave up; with Voice leading on, the whole path, so the voices' movement shows. A chord with no voicing pinned, or any chord in Chord tones, shows its notes (`chordNotes`) from the root under middle C, in grey: they aren't a voicing. Its length is split at the bar lines into whole notes (a bar) and half notes (with a stem: up when the notes sit low, down when high), tied; ties are thin crescents curving away from the middle line, deeper the longer they are.
+- **Scales:** its scale from the root to the octave, as filled heads spread over its length, clear of the bar lines.
+
+A note a step above the one under it goes beside it; accidentals stand left of the notes, moved further left when they'd touch; notes off the staff get ledger lines; the staff is as tall as its highest and lowest notes need. Chord symbols are what was typed, so `staff.js` escapes them. The playing chord's span is tinted (`.staff-now`) and a line marks the beat (`.staff-playhead`).
+
+## Playing
+
+The player bar plays the progression with a metronome: **Play** (or `Space`, unless a button has the focus) starts it, again stops it.
+
+- **Timing:** Web Audio, scheduled 0.12 s ahead every 25 ms (`schedule`), so the beats stay even when the page is busy; each beat also sets a timer for the screen (`showBeat`). Each chord plays for its `beats` (`timeline`); the tempo (`bpm`, 40 to 240) applies from the next beat. **Count-in** plays a bar of clicks first; **Loop** starts over after the last chord, or else it stops there. The progression can change while it plays: it reads the chords at every beat.
+- **Sound:** **Click** is a short tick on every beat, higher on the first of the bar. Each chord sounds as it starts (`chordSound`): its pinned voicing, or else its notes from the root, and with **Bass** the root an octave lower. How, the sound button says (`state.ui.sound`, `SOUNDS`): **Pluck** strums it low to high, a burst of noise run through a delay one period long (Karplus–Strong), made once per pitch; a pad holds it for the chord's whole length, oscillators per note through a low-pass filter, fading in over its attack and out over its release, so one chord melts into the next: **Ambient** (a slow filter sweep, a long tail), **Warm pad** (two detuned saws), **Strings** (three saws with vibrato), **Organ** (sines); or **Off**. No samples to ship.
+  - The chords go through one mix (`makeMix`): at **Volume**, dry and through a reverb at **Space** (a convolver whose impulse is a few seconds of fading noise), into a compressor; the click goes straight to the compressor. Space and Volume change at once; a new sound starts with the next chord. Stopping fades the pads still sounding (`fadeVoices`).
+  - The sound button names the sound and is on (tinted) unless it's Off; its card (`#sound-card`), hidden until the button is clicked, holds the choice, Space, Volume and Bass, and closes on a click elsewhere or `Esc`.
+- **Follow** (`follow`, on at first): while playing, the boards show only the chord playing and the next one (`followedRows`; the first two during the count-in, round to the first again when looping), drawn as tall as the pane allows (`fittedGap`, without touching the saved height), and drawn again as each chord starts. Height and Fit wait, dimmed. Stopping, or turning Follow off, brings every board back at the slider's height.
+- **Marks** (`markPlaying`, again after any render): the chord's row in the sidebar, its board (the others rest at a third; it scrolls into view as it starts), in Overlay the other chords' dots and lines faded, its span on the staff (which scrolls to it), the beat's dot, and "Dm7 · bar 2 of 4" or "Count-in 3".
+
 ## Pins and voice leading
 
 - **Pointing** at a dot lights up every voicing that uses that note; at a line, that voicing. The board's other voicings fade.
@@ -91,6 +123,7 @@ The Height slider sets the gap between strings, 16 to 44 px, which is how tall t
 - **My presets** (`state.ui.saved`): **Save**, in the Progression heading, opens a name field above the list, filled with the progression's name (`state.ui.title`) or else its chords, and selected so typing replaces it. Enter keeps the progression under that name; `Esc` or leaving the field cancels. A name that's already there, in any case, replaces that one, with Undo. A click on a saved progression loads it as a preset does, its **+** adds it to the end, and Delete removes it, with Undo. A saved chord keeps its roman numeral and what was typed, but not its id, pin or being hidden.
 - The progression's name (`title`) is the preset's when one is loaded, or added to an empty progression; Clear, or typing chords into an empty progression, clears it. So Save offers the name of what's on screen, and saving a loaded preset of your own again, changed, replaces it.
 - A chord's row shows its color, its name as written (Cmaj9, though it's voiced as Cmaj7), its roman numeral, "voiced as Cmaj7" when its voicings are another chord's (`voicedAs`, not in Chord tones), all its notes and its pinned frets. Under the mouse it shows Hide / Show and Remove. Toasts, the legend, the path and My presets name chords as written too.
+- At the end of the notes' line, under the row's buttons' line so they don't cover it, the chord's **length** (`chord.beats`, see [theory.md](theory.md#lengths)): half a bar to four bars, for the staff and the player. It reads as plain text until the mouse is on it. A new chord lasts a bar; ready-made progressions give the I (or i) of a ii–V–I two. My presets keep lengths and scales.
 - **Dragging a row moves the chord** (`initChordDrag`, pointer events rather than HTML drag and drop, which Tauri's own file drop handling stops on Windows). A press that moves less than 4 px stays a click. The row follows the pointer, raised, and a line in the accent color shows where it will go: before the first row whose middle is below the pointer. Releasing moves it there (`moveChordTo`); `Esc` puts it back. Colors stay with the places, not the chords, so the chord that becomes first turns blue. A double-click on the name puts a field in its place; Enter or leaving the field reads it, `Esc` cancels. A new chord loses the roman numeral and the pin.
 - **Remove**, **Clear**, loading a preset, and replacing or deleting a saved one show a toast with **Undo** (also `Z`) instead of asking first, as in Unified Mail.
 
@@ -102,11 +135,15 @@ The Height slider sets the gap between strings, 16 to 44 px, which is how tall t
 | `V` | Stacked or Overlay |
 | `N` | Intervals or Notes |
 | `L` | Voice leading |
+| `S` | Scales |
+| `Space` | Play or stop (not while a button or a select has the focus: Space is theirs) |
 | `A` | Focus Add chords |
 | `Z` | The toast's action (Undo) while it shows |
 | `Esc` | Close Settings; otherwise unpin everything |
 
 Shortcuts don't act while typing in a field or with Cmd, Ctrl or Alt held. With a Latin layout they go by the character typed; with any other, such as Russian, by the key's position (`e.code`), so `V` works whichever layout is on.
+
+In the app, a right-click shows no menu: the web view's own (Back, Reload, Print) means nothing there. Text fields keep it, for Cut, Copy and Paste, and with Shift held it shows anywhere, which gives Inspect in the test app. A page in a browser keeps its menu.
 
 ## Settings
 

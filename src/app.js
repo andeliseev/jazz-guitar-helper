@@ -2,26 +2,37 @@
 // Music theory is in theory.js, drawing the fretboards in fretboard.js. docs/ui.md describes it.
 
 import {
+  DEFAULT_BEATS,
   DROPS,
   KEYS,
+  LENGTHS,
   PRESETS,
+  SCALES,
   STRING_NAMES,
   chordName,
   chordNotes,
+  chordScale,
   chordSymbol,
   chordTones,
   fretText,
   inversionName,
+  lengthName,
   notesOnNeck,
   parseChord,
   parseChords,
   presetChords,
   presetKey,
+  scaleChoices,
+  scaleName,
+  scaleNotes,
+  scaleOnNeck,
+  staffStep,
   suggestChords,
   voiceLead,
   voicings,
 } from './theory.js';
-import { boardMarkup, geometry, notesMarkup, rulerMarkup } from './fretboard.js';
+import { boardHeight, boardMarkup, geometry, notesMarkup, rulerMarkup } from './fretboard.js';
+import { staffMarkup } from './staff.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // Chord colors .c0 to .c7 in styles.css, by the chord's place in the progression.
@@ -31,6 +42,7 @@ const FRET_CHOICES = [12, 15, 17, 20, 22, 24];
 // Height in the toolbar: a board per chord is shorter than the one board for all of them.
 const GAPS = { stacked: 20, overlay: 32 };
 const GAP_RANGE = [16, 44];
+const BPM_RANGE = [40, 240];
 const MAX_DOT_RADIUS = 14;
 const RULER_HEIGHT = 22;
 const SAVE_DELAY_MS = 300;
@@ -56,6 +68,7 @@ const ICONS = {
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const mod = (n, m) => ((n % m) + m) % m;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -130,6 +143,25 @@ function defaultUi() {
     leading: false,
     // Every note of each chord on the neck, besides its voicings.
     allNotes: false,
+    // Each chord's scale on the neck, outlined (the chord's `scale`, or chordScale's default).
+    scales: false,
+    // The progression on a staff above the boards: each chord's voicing or notes, or its scale.
+    staff: false,
+    staffShows: 'chords',
+    // The metronome bar: beats per minute, a bar of clicks first, round and round, its click, and
+    // while playing only that chord's board and the next one's.
+    bpm: 100,
+    countIn: true,
+    loop: true,
+    click: true,
+    follow: true,
+    // The chords' sound while playing (SOUNDS): off, plucked once, or a pad held for the chord's
+    // length; how much reverb (`space`) and how loud (`volume`), 0–100; and the root an octave
+    // lower (`bass`).
+    sound: 'ambient',
+    space: 50,
+    volume: 70,
+    bass: true,
     // The pinned voicing of each chord (chord id → voicing id), and the chord last clicked,
     // which voice leading starts from; `autoAnchor` when the app chose it (startPath).
     pins: {},
@@ -183,6 +215,15 @@ function sanitize(saved) {
   }
   ui.leading = !!saved.leading;
   ui.allNotes = !!saved.allNotes;
+  ui.scales = !!saved.scales;
+  ui.staff = !!saved.staff;
+  if (saved.staffShows === 'scales') ui.staffShows = 'scales';
+  if (Number.isInteger(saved.bpm) && saved.bpm >= BPM_RANGE[0] && saved.bpm <= BPM_RANGE[1]) ui.bpm = saved.bpm;
+  for (const key of ['countIn', 'loop', 'click', 'follow', 'bass']) if (typeof saved[key] === 'boolean') ui[key] = saved[key];
+  // `sound` was on or off before there were pads: off stays off, on was the pluck.
+  if (SOUNDS[saved.sound]) ui.sound = saved.sound;
+  else if (typeof saved.sound === 'boolean') ui.sound = saved.sound ? 'pluck' : 'off';
+  for (const key of ['space', 'volume']) if (Number.isInteger(saved[key]) && saved[key] >= 0 && saved[key] <= 100) ui[key] = saved[key];
   if (saved.pins && typeof saved.pins === 'object') {
     for (const [id, pin] of Object.entries(saved.pins)) if (typeof pin === 'string') ui.pins[id] = pin;
   }
@@ -204,6 +245,8 @@ function cleanChord(c) {
     role: typeof c.role === 'string' ? c.role : '',
     text: typeof c.text === 'string' ? c.text : undefined,
     approx: !!c.approx,
+    beats: LENGTHS.includes(c.beats) ? c.beats : DEFAULT_BEATS,
+    scale: SCALES[c.scale] ? c.scale : undefined,
   };
   return chordTonesOk(chord) ? chord : null;
 }
@@ -305,6 +348,10 @@ function render() {
   renderSidebar();
   renderToolbar();
   renderBoards();
+  renderStaff();
+  renderPlayer();
+  // Drawn again, so what's playing is marked again.
+  markPlaying();
   scheduleSave();
 }
 
@@ -360,7 +407,20 @@ function chordItem(chord, index) {
   if (chord.role) head.append(el('span', 'role', chord.role));
   const voiced = voicedAs(chord);
   if (voiced) head.append(el('span', 'voiced', voiced));
-  item.append(head, el('div', 'notes', chordNotes(chord).map((t) => t.name).join(' ')));
+  // Under the row's buttons is the name; the length sits on the notes' line, at its end.
+  const notes = el('div', 'notes');
+  const length = el('select', 'length');
+  length.dataset.lengthFor = chord.id;
+  length.title = 'How long the chord lasts, for the staff and the metronome';
+  length.setAttribute('aria-label', `Length of ${chordSymbol(chord)}`);
+  for (const beats of LENGTHS) {
+    const option = el('option', null, lengthName(beats));
+    option.value = beats;
+    option.selected = beats === chord.beats;
+    length.append(option);
+  }
+  notes.append(el('span', 'note-names', chordNotes(chord).map((t) => t.name).join(' ')), length);
+  item.append(head, notes);
   const pinned = pinnedVoicing(chord);
   if (pinned) {
     const frets = el('div', 'frets', fretText(pinned));
@@ -420,7 +480,7 @@ function initChordDrag() {
   list.addEventListener('pointerdown', (e) => {
     state.suppressClick = false;
     const item = e.target.closest('.chord-item');
-    if (e.button !== 0 || !item || e.target.closest('button, input')) return;
+    if (e.button !== 0 || !item || e.target.closest('button, input, select')) return;
     drag = { item, pointerId: e.pointerId, startY: e.clientY, active: false };
   });
   document.addEventListener('pointermove', (e) => {
@@ -492,6 +552,12 @@ function renderToolbar() {
   $('#all-notes').setAttribute('aria-pressed', String(ui.allNotes));
   $('#leading').disabled = tones;
   $('#all-notes').disabled = tones;
+  $('#scales').setAttribute('aria-pressed', String(ui.scales));
+  $('#staff-toggle').setAttribute('aria-pressed', String(ui.staff));
+  $('#tempo').value = ui.bpm;
+  $('#tempo-value').textContent = ui.bpm;
+  for (const b of $$('#player button[data-option]')) b.setAttribute('aria-pressed', String(ui[b.dataset.option]));
+  renderSound();
   $('#height').value = ui.heights[ui.view];
   $('#frets').value = String(ui.frets);
 }
@@ -517,15 +583,64 @@ function renderBoards() {
   }
   const style = getComputedStyle(boards);
   state.boardsWidth = boards.clientWidth;
+  state.boardsHeight = boards.clientHeight;
   const width = Math.floor(boards.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
-  // In Stacked each board has its own fret numbers, so a fret reads at any board without looking up.
-  const geo = geometry(width, ui.frets, { gap: ui.heights[ui.view], leftHanded: ui.leftHanded, numbers: ui.view === 'stacked' });
-  state.geo = geo;
-  const nodes = [ruler(geo)];
-  if (ui.view === 'overlay') nodes.push(overlayView(geo));
-  else for (const row of state.rows) nodes.push(stackedRow(row, geo));
-  boards.replaceChildren(...nodes);
+  // Following the playing chord: only it and the next one, as tall as the pane allows.
+  const follow = following();
+  const rows = follow ? followedRows() : state.rows;
+  const draw = (gap) => {
+    // In Stacked each board has its own fret numbers, so a fret reads at any board without looking up.
+    const geo = geometry(width, ui.frets, { gap, leftHanded: ui.leftHanded, numbers: ui.view === 'stacked' });
+    state.geo = geo;
+    const nodes = [ruler(geo)];
+    if (ui.view === 'overlay') nodes.push(overlayView(geo, rows));
+    else for (const row of rows) nodes.push(stackedRow(row, geo));
+    boards.replaceChildren(...nodes);
+  };
+  draw(ui.heights[ui.view]);
+  if (follow) {
+    const gap = fittedGap();
+    if (gap !== ui.heights[ui.view]) draw(gap);
+  }
   restyle();
+}
+
+/**
+ * The tallest boards (px between strings) that let every board drawn show in the pane without
+ * scrolling, or the smallest when they can't. Measured on what's drawn: its headings, the fret
+ * numbers on top, the legend stay as they are, and only the boards grow.
+ */
+function fittedGap() {
+  const boards = $('#boards');
+  const svgs = $$('#boards svg.board');
+  if (!svgs.length) return state.ui.heights[state.ui.view];
+  const drawn = svgs.reduce((sum, svg) => sum + Number(svg.getAttribute('height')), 0);
+  const content = Math.max(...[...boards.children].map((n) => n.offsetTop + n.offsetHeight)) + parseFloat(getComputedStyle(boards).paddingBottom);
+  const around = content - drawn;
+  const numbers = state.ui.view === 'stacked';
+  let gap = GAP_RANGE[1];
+  while (gap > GAP_RANGE[0] && around + svgs.length * boardHeight(gap, numbers) > boards.clientHeight) gap -= 1;
+  return gap;
+}
+
+/** The view's height (px between strings), from Height or Fit. The boards follow at most once a frame. */
+function setHeight(gap) {
+  state.ui.heights[state.ui.view] = gap;
+  $('#height').value = gap;
+  if (!state.heightFrame) {
+    state.heightFrame = requestAnimationFrame(() => {
+      state.heightFrame = 0;
+      renderBoards();
+      markPlaying();
+    });
+  }
+  scheduleSave();
+}
+
+/** Fit: the boards as tall as the pane allows with all of them showing; the slider follows. */
+function fitHeight() {
+  if (following() || $('#boards').hidden) return;
+  setHeight(fittedGap());
 }
 
 function svgNode(width, height) {
@@ -548,18 +663,37 @@ function ruler(geo) {
 /**
  * What a board draws for a chord: its voicings, each note labeled as chosen, and with All notes on,
  * every other place its notes are on the neck, outlined (`extras`). Chord tones draws those places
- * as dots of their own (`notes`), and no voicings.
+ * as dots of their own (`notes`), and no voicings. With Scales on, the chord's scale is outlined
+ * around them; a spot that's the chord's own keeps its look.
  */
 function layerOf(row) {
   const { ui } = state;
+  const options = { frets: ui.frets, openStrings: ui.openStrings };
   const note = (n) => ({ string: n.string, fret: n.fret, label: ui.labels === 'notes' ? n.tone.name : n.tone.label, root: n.tone.deg === 1 });
-  const neck = () => notesOnNeck(row.chord, { frets: ui.frets, openStrings: ui.openStrings }).map(note);
-  if (ui.mode === 'tones') return { cls: row.cls, voicings: [], notes: neck() };
+  const scale = ui.scales ? scaleOnNeck(row.chord, chordScale(row.chord), options).map(note) : [];
+  if (ui.mode === 'tones') return { cls: row.cls, voicings: [], notes: notesOnNeck(row.chord, options).map(note), extras: scale };
   return {
     cls: row.cls,
     voicings: row.voicings.map((v) => ({ id: v.key, notes: v.notes.map(note) })),
-    extras: ui.allNotes ? neck() : [],
+    extras: [...(ui.allNotes ? notesOnNeck(row.chord, options).map(note) : []), ...scale],
   };
+}
+
+/** The scale picker for a chord (Scales on): its scales by name, and the notes of the one chosen. */
+function scalePicker(chord) {
+  const box = el('span', 'scale-pick');
+  const select = el('select');
+  select.dataset.scaleFor = chord.id;
+  select.setAttribute('aria-label', `Scale over ${chordSymbol(chord)}`);
+  const chosen = chordScale(chord);
+  for (const key of scaleChoices(chord)) {
+    const option = el('option', null, scaleName(chord, key));
+    option.value = key;
+    option.selected = key === chosen;
+    select.append(option);
+  }
+  box.append(select, el('span', 'scale-notes', scaleNotes(chord, chosen).map((t) => t.name).join(' ')));
+  return box;
 }
 
 /** What a board shows, for its label: "Dm7: Drop 2 voicings", "All chords: chord tones". */
@@ -585,6 +719,7 @@ function stackedRow(row, geo) {
   if (row.chord.role) head.append(el('span', 'row-role', row.chord.role));
   const voiced = voicedAs(row.chord);
   if (voiced) head.append(el('span', 'row-voiced', voiced));
+  if (state.ui.scales) head.append(scalePicker(row.chord));
   const info = el('span', 'row-info');
   info.dataset.chord = row.chord.id;
   head.append(info);
@@ -593,18 +728,19 @@ function stackedRow(row, geo) {
   return section;
 }
 
-function overlayView(geo) {
+function overlayView(geo, rows) {
   const section = el('section', 'overlay-view');
   const legend = el('div', 'legend');
-  for (const row of state.rows) {
+  for (const row of rows) {
     const item = el('span', `legend-item ${row.cls}`);
     item.dataset.chord = row.chord.id;
     item.append(el('span', 'dot'), el('b', null, chordSymbol(row.chord)));
     if (row.chord.role) item.append(el('span', 'row-role', row.chord.role));
+    if (state.ui.scales) item.append(scalePicker(row.chord));
     item.append(el('span', 'frets'));
     legend.append(item);
   }
-  section.append(legend, board(geo, state.rows.map(layerOf), showing('All chords')), el('div', 'overlay-info'));
+  section.append(legend, board(geo, rows.map(layerOf), showing(rows.length < state.rows.length ? 'The chord playing and the next' : 'All chords')), el('div', 'overlay-info'));
   return section;
 }
 
@@ -700,6 +836,420 @@ function moveBand(fret) {
   for (const n of $$('#boards .fret-number')) n.classList.toggle('active', Number(n.dataset.fret) === fret);
 }
 
+// Staff (staff.js): above the boards, the progression's bars, each chord for its length.
+
+/** The chord's root as a MIDI note in the octave under middle C, where the staff starts its notes. */
+function lowRoot(chord) {
+  return 48 + chordTones(chord)[0].pc;
+}
+
+/**
+ * What the staff shows for each chord: its pinned voicing, or else its notes from the root (in
+ * Chord tones, and for a chord with no pin), or with Scales chosen there, its scale. Pitches are
+ * written an octave up, as guitar music is.
+ */
+function staffEntries() {
+  const { ui } = state;
+  return ui.chords.map((chord, index) => {
+    const entry = { symbol: chordSymbol(chord), cls: `c${index % COLORS}`, beats: chord.beats };
+    const note = (tone, midi) => ({ step: staffStep(tone, midi + 12), acc: tone.acc });
+    if (ui.staffShows === 'scales') {
+      const notes = scaleNotes(chord, chordScale(chord));
+      const root = lowRoot(chord);
+      return { ...entry, kind: 'scale', notes: [...notes.map((t) => note(t, root + t.semis)), note(notes[0], root + 12)] };
+    }
+    const pinned = pinnedVoicing(chord);
+    if (pinned) return { ...entry, kind: 'voicing', notes: pinned.notes.map((n) => note(n.tone, n.pitch)) };
+    return { ...entry, kind: 'notes', notes: chordNotes(chord).map((t) => note(t, lowRoot(chord) + t.semis)) };
+  });
+}
+
+function renderStaff() {
+  const { ui } = state;
+  const section = $('#staff');
+  section.hidden = !ui.staff || !ui.chords.length;
+  state.staffSpans = [];
+  if (section.hidden) return;
+  for (const b of $$('#staff-shows button')) b.setAttribute('aria-checked', String(b.dataset.shows === ui.staffShows));
+  const layout = staffMarkup(staffEntries(), $('#staff-scroll').clientWidth);
+  const svg = $('#staff-svg');
+  svg.setAttribute('width', layout.width);
+  svg.setAttribute('height', layout.height);
+  svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+  svg.innerHTML = layout.markup;
+  state.staffSpans = layout.spans;
+}
+
+// Playing (#player): a metronome walks through the progression, each chord for its length, round
+// and round, and the chord playing stands out everywhere. Web Audio, scheduled a little ahead of
+// time so the beats stay even; the screen follows with timers.
+
+const LOOKAHEAD_S = 0.12;
+const SCHEDULE_MS = 25;
+const STRUM_S = 0.028;
+const REVERB_S = 3;
+
+// The chords' sounds. A pad holds the chord for its length: oscillators per note ([wave, frequency
+// ratio, detune in cents, level]) through a low-pass filter, fading in over `attack` and out over
+// `release`, so one chord melts into the next. `sweep` moves the filter slowly (Hz, at `sweepRate`),
+// `vibrato` wobbles the pitch.
+const SOUNDS = {
+  off: { name: 'Off' },
+  pluck: { name: 'Pluck' },
+  ambient: {
+    name: 'Ambient',
+    attack: 0.9,
+    release: 2.2,
+    cutoff: 950,
+    q: 2.2,
+    sweep: 650,
+    sweepRate: 0.13,
+    level: 0.06,
+    oscillators: [['sawtooth', 1, -6, 0.55], ['triangle', 1, 6, 1], ['sine', 2, 0, 0.35]],
+  },
+  warm: { name: 'Warm pad', attack: 0.35, release: 0.9, cutoff: 1150, q: 0.8, level: 0.065, oscillators: [['sawtooth', 1, -7, 1], ['sawtooth', 1, 7, 1]] },
+  strings: {
+    name: 'Strings',
+    attack: 0.7,
+    release: 1.3,
+    cutoff: 2300,
+    q: 0.5,
+    vibrato: 5.5,
+    level: 0.045,
+    oscillators: [['sawtooth', 1, -12, 1], ['sawtooth', 1, 0, 1], ['sawtooth', 1, 11, 1]],
+  },
+  organ: { name: 'Organ', attack: 0.04, release: 0.25, cutoff: 7000, q: 0.3, level: 0.085, oscillators: [['sine', 1, 0, 1], ['sine', 2, 0, 0.5], ['sine', 3, 0, 0.22]] },
+};
+
+// `mix`: the chords' sound goes through it, dry and through a reverb, to a compressor; the click
+// goes straight to the compressor. `voices`: pads still sounding, to fade them when stopping.
+const player = { ctx: null, mix: null, buffers: new Map(), voices: [], playing: false, timer: 0, endTimer: 0, next: 0, beat: 0, shown: null };
+
+const clock = () => (player.ctx ? player.ctx.currentTime : performance.now() / 1000);
+
+/** Where each chord starts in the progression and how long it lasts, in beats. */
+function timeline() {
+  let start = 0;
+  return state.ui.chords.map((chord, index) => {
+    const span = { chord, index, start, beats: chord.beats };
+    start += chord.beats;
+    return span;
+  });
+}
+
+/** Follow on while playing: the boards show only the chord playing and the next one. */
+function following() {
+  return player.playing && state.ui.follow;
+}
+
+/**
+ * The rows Follow draws: the playing chord's (the first one's during the count-in) and the next
+ * one's, round to the first again when looping. Hidden chords have no board and are skipped.
+ */
+function followedRows() {
+  const { chords } = state.ui;
+  const at = player.shown && player.shown.index >= 0 ? player.shown.index : 0;
+  const picked = [];
+  for (let k = 0; k < chords.length && picked.length < 2; k++) {
+    if (at + k >= chords.length && !state.ui.loop) break;
+    const row = state.rows.find((r) => r.chord.id === chords[(at + k) % chords.length].id);
+    if (row && !picked.includes(row)) picked.push(row);
+  }
+  return picked.length ? picked : state.rows;
+}
+
+function togglePlay() {
+  if (player.playing) stopPlaying();
+  else startPlaying();
+}
+
+function startPlaying() {
+  if (!state.ui.chords.length) return;
+  audio();
+  clearTimeout(player.endTimer);
+  player.playing = true;
+  // A bar of clicks first: the count-in's beats are -4 to -1.
+  player.beat = state.ui.countIn ? -4 : 0;
+  player.next = clock() + 0.1;
+  player.shown = null;
+  renderPlayer();
+  if (state.ui.follow) renderBoards();
+  schedule();
+}
+
+function stopPlaying() {
+  const followed = following();
+  player.playing = false;
+  clearTimeout(player.timer);
+  clearTimeout(player.endTimer);
+  fadeVoices();
+  player.shown = null;
+  renderPlayer();
+  // Every board again, as tall as the slider says.
+  if (followed) renderBoards();
+  markPlaying();
+}
+
+/** Schedules the beats due in the next moment: their click, a chord's sound as it starts, and the screen. */
+function schedule() {
+  const spans = timeline();
+  const total = spans.reduce((sum, s) => sum + s.beats, 0);
+  if (!total) return stopPlaying();
+  while (player.next < clock() + LOOKAHEAD_S) {
+    // The progression may have changed while playing.
+    if (player.beat >= total) player.beat = 0;
+    const beat = player.beat;
+    const time = player.next;
+    const span = beat >= 0 ? spans.find((s) => beat < s.start + s.beats) : null;
+    if (player.ctx) {
+      if (state.ui.click) tick(time, mod(beat, 4) === 0);
+      if (span && beat === span.start) chordSound(span.chord, time, (span.beats * 60) / state.ui.bpm);
+    }
+    setTimeout(() => showBeat(beat, span), Math.max(0, (time - clock()) * 1000));
+    player.next += 60 / state.ui.bpm;
+    player.beat += 1;
+    if (player.beat >= total && !state.ui.loop) {
+      player.endTimer = setTimeout(stopPlaying, Math.max(0, (player.next - clock()) * 1000));
+      return;
+    }
+  }
+  player.voices = player.voices.filter((v) => v.stop > clock());
+  player.timer = setTimeout(schedule, SCHEDULE_MS);
+}
+
+function showBeat(beat, span) {
+  if (!player.playing) return;
+  const before = player.shown?.chordId;
+  player.shown = { beat, chordId: span ? span.chord.id : null, index: span ? span.index : -1, frac: span ? (beat - span.start + 0.5) / span.beats : 0 };
+  // Following, a new chord brings new boards: it and the one after it.
+  if (span && span.chord.id !== before && following()) renderBoards();
+  markPlaying();
+  // A new chord comes into view, on its board and on the staff.
+  if (span && span.chord.id !== before) {
+    if (!following()) $(`#boards .row[data-chord="${span.chord.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const at = state.staffSpans[span.index];
+    const scroll = $('#staff-scroll');
+    if (at && (at[0] < scroll.scrollLeft || at[1] > scroll.scrollLeft + scroll.clientWidth)) {
+      scroll.scrollTo({ left: Math.max(0, at[0] - 40), behavior: 'smooth' });
+    }
+  }
+}
+
+/** Marks the chord playing: its row, its board (the others rest), its bar on the staff, the beat. */
+function markPlaying() {
+  const shown = player.playing ? player.shown : null;
+  const id = shown ? shown.chordId : null;
+  for (const item of $$('#chords .chord-item')) item.classList.toggle('playing', id != null && Number(item.dataset.id) === id);
+  for (const row of $$('#boards .row')) row.classList.toggle('resting', id != null && Number(row.dataset.chord) !== id);
+  const cls = id != null ? `c${shown.index % COLORS}` : null;
+  for (const node of $$('#boards .overlay-view .dot, #boards .overlay-view .shape')) node.classList.toggle('resting', !!cls && !node.classList.contains(cls));
+  const span = id != null ? state.staffSpans[shown.index] : null;
+  const now = $('#staff-svg .staff-now');
+  const head = $('#staff-svg .staff-playhead');
+  if (now && head) {
+    now.setAttribute('x', span ? span[0] : 0);
+    now.setAttribute('width', span ? span[1] - span[0] : 0);
+    head.setAttribute('visibility', span ? 'visible' : 'hidden');
+    if (span) {
+      const x = Math.round((span[0] + (span[1] - span[0]) * shown.frac) * 10) / 10;
+      head.setAttribute('x1', x);
+      head.setAttribute('x2', x);
+    }
+  }
+  $$('#beats i').forEach((dot, k) => dot.classList.toggle('on', !!shown && mod(shown.beat, 4) === k));
+  const bars = Math.ceil(state.ui.chords.reduce((sum, c) => sum + c.beats, 0) / 4);
+  const chord = id != null ? state.ui.chords.find((c) => c.id === id) : null;
+  $('#play-status').textContent = !shown
+    ? ''
+    : shown.beat < 0
+      ? `Count-in ${shown.beat + 5}`
+      : `${chord ? chordSymbol(chord) : ''} · bar ${Math.floor(shown.beat / 4) + 1} of ${bars}`;
+}
+
+function renderPlayer() {
+  const play = $('#play');
+  play.setAttribute('aria-pressed', String(player.playing));
+  $('#play-text').textContent = player.playing ? 'Stop' : 'Play';
+  play.disabled = !state.ui.chords.length && !player.playing;
+  // While Follow sizes the boards, Height and Fit wait.
+  const follow = following();
+  $('#height').disabled = follow;
+  $('#fit').disabled = follow;
+  $('#height').closest('.height-pick').classList.toggle('off', follow);
+}
+
+/** The audio context, made on the first Play (a click or a key), as browsers allow. */
+function audio() {
+  if (!player.ctx) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    if (!Context) return null;
+    try {
+      player.ctx = new Context();
+    } catch {
+      return null;
+    }
+  }
+  if (player.ctx.state === 'suspended') player.ctx.resume();
+  if (!player.mix) player.mix = makeMix(player.ctx);
+  return player.ctx;
+}
+
+/** The mix: the chords' sound at `volume`, dry and through a reverb at `space`, into a compressor. */
+function makeMix(ctx) {
+  const out = ctx.createDynamicsCompressor();
+  out.connect(ctx.destination);
+  const chords = ctx.createGain();
+  chords.connect(out);
+  // A room: a few seconds of noise fading away, as the reverb's impulse.
+  const reverb = ctx.createConvolver();
+  const length = Math.round(ctx.sampleRate * REVERB_S);
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6;
+  }
+  reverb.buffer = impulse;
+  const wet = ctx.createGain();
+  chords.connect(reverb).connect(wet).connect(out);
+  const mix = { out, chords, wet };
+  setMix(mix);
+  return mix;
+}
+
+/** Space and Volume, at once, even while playing. */
+function setMix(mix = player.mix) {
+  if (!mix) return;
+  mix.chords.gain.value = state.ui.volume / 100;
+  mix.wet.gain.value = state.ui.space / 100;
+}
+
+/** The metronome's click, higher on the first beat of a bar. */
+function tick(time, accent) {
+  const ctx = player.ctx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = accent ? 1760 : 1320;
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.3, time + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.045);
+  osc.connect(gain).connect(player.mix.out);
+  osc.start(time);
+  osc.stop(time + 0.05);
+}
+
+/**
+ * A chord as it starts, for `seconds`: its pinned voicing, or else its notes from the root, with
+ * Bass the root an octave lower; plucked low to high, or held by a pad for the chord's length.
+ */
+function chordSound(chord, time, seconds) {
+  const { ui } = state;
+  if (ui.sound === 'off' || !player.ctx) return;
+  const pinned = pinnedVoicing(chord);
+  const pitches = pinned ? pinned.notes.map((n) => n.pitch) : chordNotes(chord).map((t) => lowRoot(chord) + t.semis).sort((a, b) => a - b);
+  if (ui.bass) pitches.unshift(lowRoot(chord) - 12);
+  if (ui.sound === 'pluck') {
+    pitches.forEach((midi, k) => pluck(midi, time + k * STRUM_S, 0.3));
+    return;
+  }
+  const sound = SOUNDS[ui.sound];
+  pitches.forEach((midi, k) => pad(midi, time, time + seconds, sound, sound.level * (ui.bass && k === 0 ? 1.3 : 1)));
+}
+
+/** One note of a pad, from `start` to `end`, then fading over its release. */
+function pad(midi, start, end, sound, level) {
+  const ctx = player.ctx;
+  const freq = 440 * 2 ** ((midi - 69) / 12);
+  const stop = end + sound.release + 0.05;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(level, start + sound.attack);
+  gain.gain.setValueAtTime(level, Math.max(start + sound.attack, end));
+  gain.gain.exponentialRampToValueAtTime(0.0001, end + sound.release);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = sound.cutoff;
+  filter.Q.value = sound.q;
+  filter.connect(gain).connect(player.mix.chords);
+  const nodes = [];
+  const lfo = (rate, depth, target) => {
+    const osc = ctx.createOscillator();
+    const amount = ctx.createGain();
+    osc.frequency.value = rate;
+    amount.gain.value = depth;
+    osc.connect(amount).connect(target);
+    osc.start(start);
+    osc.stop(stop);
+    nodes.push(osc);
+  };
+  if (sound.sweep) lfo(sound.sweepRate, sound.sweep, filter.frequency);
+  for (const [type, ratio, detune, share] of sound.oscillators) {
+    const osc = ctx.createOscillator();
+    const amount = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq * ratio;
+    osc.detune.value = detune;
+    amount.gain.value = share;
+    osc.connect(amount).connect(filter);
+    if (sound.vibrato) lfo(sound.vibrato, 4, osc.detune);
+    osc.start(start);
+    osc.stop(stop);
+    nodes.push(osc);
+  }
+  player.voices.push({ gain, nodes, stop });
+}
+
+/** Stopping: the pads still sounding fade out in a moment instead of ringing on. */
+function fadeVoices() {
+  const ctx = player.ctx;
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  for (const v of player.voices) {
+    v.gain.gain.cancelScheduledValues(t);
+    v.gain.gain.setValueAtTime(v.gain.gain.value, t);
+    v.gain.gain.linearRampToValueAtTime(0, t + 0.25);
+    for (const node of v.nodes) {
+      try {
+        node.stop(t + 0.3);
+      } catch {
+        // Already stopped.
+      }
+    }
+  }
+  player.voices = [];
+}
+
+/** A plucked string (Karplus–Strong): a burst of noise through a delay as long as one period. */
+function pluck(midi, time, level) {
+  const ctx = player.ctx;
+  let buffer = player.buffers.get(midi);
+  if (!buffer) {
+    const rate = ctx.sampleRate;
+    const period = Math.max(2, Math.round(rate / (440 * 2 ** ((midi - 69) / 12))));
+    const length = Math.round(rate * 2.2);
+    const ring = new Float32Array(period);
+    for (let i = 0; i < period; i++) ring[i] = Math.random() * 2 - 1;
+    const data = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+      const k = i % period;
+      data[i] = ring[k];
+      ring[k] = 0.4985 * (ring[k] + ring[(k + 1) % period]);
+    }
+    // Fade the last tenth of a second, so it ends without a click.
+    const fade = Math.round(rate * 0.1);
+    for (let i = 0; i < fade; i++) data[length - 1 - i] *= i / fade;
+    buffer = ctx.createBuffer(1, length, rate);
+    buffer.getChannelData(0).set(data);
+    player.buffers.set(midi, buffer);
+  }
+  const source = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  gain.gain.value = level;
+  source.connect(gain).connect(player.mix.chords);
+  source.start(time);
+}
+
 // Pins
 
 /** A click on a voicing's line pins it; a click on a note pins each voicing using it in turn. */
@@ -729,6 +1279,8 @@ function setPin(chordId, voicingId) {
   }
   renderSidebar();
   restyle();
+  renderStaff();
+  markPlaying();
   scheduleSave();
 }
 
@@ -738,6 +1290,8 @@ function clearPins() {
   state.ui.autoAnchor = false;
   renderSidebar();
   restyle();
+  renderStaff();
+  markPlaying();
   scheduleSave();
 }
 
@@ -745,7 +1299,16 @@ function clearPins() {
 
 /** The progression's form of a chord read or loaded: a new id, and what was typed only when shown as the nearest. */
 function newChord(c) {
-  return { id: state.ui.nextId++, root: { ...c.root }, quality: c.quality, role: c.role || '', text: c.approx ? c.text : undefined, approx: !!c.approx };
+  return {
+    id: state.ui.nextId++,
+    root: { ...c.root },
+    quality: c.quality,
+    role: c.role || '',
+    text: c.approx ? c.text : undefined,
+    approx: !!c.approx,
+    beats: c.beats || DEFAULT_BEATS,
+    scale: c.scale,
+  };
 }
 
 function addChords(chords) {
@@ -1000,6 +1563,7 @@ function editChord(id) {
         Object.assign(chord, { root: parsed.root, quality: parsed.quality, text: parsed.approx ? parsed.text : undefined, approx: parsed.approx });
         if (!same) {
           chord.role = '';
+          chord.scale = undefined;
           delete ui.pins[chord.id];
         }
       } else {
@@ -1049,6 +1613,11 @@ function toggleLabels() {
  * On: the path shows at once, from the voicing pinned last, or else from the first chord's lowest
  * voicing. Off: only a voicing the user pinned stays pinned; the ones the path chose go.
  */
+function toggleScales() {
+  state.ui.scales = !state.ui.scales;
+  render();
+}
+
 function toggleLeading() {
   const { ui } = state;
   if (ui.mode === 'tones') return; // no voicings to lead
@@ -1224,6 +1793,11 @@ function shortcutKey(e) {
 }
 
 function onKey(e) {
+  if (e.key === 'Escape' && !$('#sound-card').hidden) {
+    showSoundCard(false);
+    $('#sound-button').focus();
+    return;
+  }
   if (e.key === 'Escape') {
     if (!$('#settings').hidden) closeSettings();
     else if (isTyping(e)) e.target.blur();
@@ -1238,6 +1812,8 @@ function onKey(e) {
   else if (key === 'v') toggleView();
   else if (key === 'n') toggleLabels();
   else if (key === 'l') toggleLeading();
+  else if (key === 's') toggleScales();
+  else if (key === ' ' && !e.target.closest?.('button, select')) togglePlay();
   else if (key === 'z' && toastAction) runToastAction();
   else if (key === 'a') {
     e.preventDefault();
@@ -1248,6 +1824,13 @@ function onKey(e) {
 
 function bindEvents() {
   document.addEventListener('keydown', onKey);
+  // In the app the web view's own menu (Back, Reload, Print) means nothing. Fields keep it, for
+  // Cut, Copy and Paste, and with Shift it shows anywhere (Inspect, in the test app).
+  if (tauri) {
+    document.addEventListener('contextmenu', (e) => {
+      if (!isTyping(e) && !e.shiftKey) e.preventDefault();
+    });
+  }
 
   // Sidebar
   initChordDrag();
@@ -1262,7 +1845,7 @@ function bindEvents() {
       render();
     } else if (action === 'remove') {
       removeChord(index);
-    } else if (!action && !e.target.closest('input')) {
+    } else if (!action && !e.target.closest('input, select')) {
       // The chord's fretboard comes into view.
       $(`.row[data-chord="${chord.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
@@ -1270,6 +1853,13 @@ function bindEvents() {
   $('#chords').addEventListener('dblclick', (e) => {
     const name = e.target.closest('.name');
     if (name) editChord(Number(name.closest('.chord-item').dataset.id));
+  });
+  // A chord's length (the select on its notes' line).
+  $('#chords').addEventListener('change', (e) => {
+    const chord = state.ui.chords.find((c) => c.id === Number(e.target.dataset.lengthFor));
+    if (!chord) return;
+    chord.beats = Number(e.target.value);
+    render();
   });
   $('#add-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1357,28 +1947,80 @@ function bindEvents() {
     state.ui.allNotes = !state.ui.allNotes;
     render();
   });
-  // The boards follow the slider as it moves, at most once a frame; a double-click goes back to
-  // the view's default height.
-  const setHeight = (gap) => {
-    state.ui.heights[state.ui.view] = gap;
-    $('#height').value = gap;
-    if (!state.heightFrame) {
-      state.heightFrame = requestAnimationFrame(() => {
-        state.heightFrame = 0;
-        renderBoards();
-      });
+  $('#scales').addEventListener('click', toggleScales);
+  $('#staff-toggle').addEventListener('click', () => {
+    state.ui.staff = !state.ui.staff;
+    render();
+  });
+  $('#staff-shows').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-shows]');
+    if (!b) return;
+    state.ui.staffShows = b.dataset.shows;
+    render();
+  });
+
+  // The metronome
+  $('#play').addEventListener('click', togglePlay);
+  // The chords' sound: its card opens from the button and closes on a click elsewhere or Esc. A
+  // new sound starts with the next chord; Space and Volume change at once.
+  $('#sound-button').addEventListener('click', () => showSoundCard($('#sound-card').hidden));
+  document.addEventListener('pointerdown', (e) => {
+    if (!$('#sound-card').hidden && !e.target.closest('.sound-pick')) showSoundCard(false);
+  });
+  $('#sounds').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-sound]');
+    if (!b) return;
+    state.ui.sound = b.dataset.sound;
+    renderSound();
+    scheduleSave();
+  });
+  for (const id of ['space', 'volume']) {
+    $('#' + id).addEventListener('input', (e) => {
+      state.ui[id] = Number(e.target.value);
+      setMix();
+      scheduleSave();
+    });
+  }
+  $('#bass').addEventListener('change', (e) => {
+    state.ui.bass = e.target.checked;
+    scheduleSave();
+  });
+  $('#tempo').addEventListener('input', (e) => {
+    state.ui.bpm = Number(e.target.value);
+    $('#tempo-value').textContent = state.ui.bpm;
+    scheduleSave();
+  });
+  $('#player').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-option]');
+    if (!b) return;
+    const key = b.dataset.option;
+    state.ui[key] = !state.ui[key];
+    b.setAttribute('aria-pressed', String(state.ui[key]));
+    if (key === 'follow' && player.playing) {
+      renderPlayer();
+      renderBoards();
+      markPlaying();
     }
     scheduleSave();
-  };
+  });
+  // The boards follow the slider as it moves, at most once a frame; a double-click goes back to
+  // the view's default height.
   $('#height').addEventListener('input', (e) => setHeight(Number(e.target.value)));
   $('#height').addEventListener('dblclick', () => setHeight(GAPS[state.ui.view]));
+  $('#fit').addEventListener('click', fitHeight);
   $('#frets').addEventListener('change', (e) => {
     state.ui.frets = Number(e.target.value);
     render();
   });
 
-  // Fretboards
+  // Fretboards. A chord's scale is chosen over its board (Scales on).
   const boards = $('#boards');
+  boards.addEventListener('change', (e) => {
+    const chord = state.ui.chords.find((c) => c.id === Number(e.target.dataset.scaleFor));
+    if (!chord) return;
+    chord.scale = e.target.value;
+    render();
+  });
   boards.addEventListener('pointerover', (e) => {
     const node = e.target.closest?.('[data-v]') || null;
     if (node === (state.hover?.node || null)) return;
@@ -1428,7 +2070,31 @@ function bindEvents() {
   $('#update').addEventListener('click', installUpdate);
 }
 
+/** The chords' sound: the button names it, and the card shows the choice and its settings. */
+function renderSound() {
+  const { ui } = state;
+  $('#sound-name').textContent = SOUNDS[ui.sound].name;
+  $('#sound-button').setAttribute('aria-pressed', String(ui.sound !== 'off'));
+  for (const b of $$('#sounds button')) b.setAttribute('aria-checked', String(b.dataset.sound === ui.sound));
+  $('#space').value = ui.space;
+  $('#volume').value = ui.volume;
+  $('#bass').checked = ui.bass;
+}
+
+function showSoundCard(open) {
+  $('#sound-card').hidden = !open;
+  $('#sound-button').setAttribute('aria-expanded', String(open));
+}
+
 function fillControls() {
+  $('#sounds').replaceChildren(
+    ...Object.entries(SOUNDS).map(([key, sound]) => {
+      const b = el('button', null, sound.name);
+      b.dataset.sound = key;
+      b.setAttribute('role', 'radio');
+      return b;
+    }),
+  );
   $('#key').replaceChildren(
     ...KEYS.map((k) => {
       const option = el('option', null, k);
@@ -1481,7 +2147,12 @@ async function init() {
   new ResizeObserver(() => {
     requestAnimationFrame(() => {
       const boards = $('#boards');
-      if (!boards.hidden && boards.clientWidth !== state.boardsWidth) renderBoards();
+      // A new width redraws the boards; so does a new height while Follow fits them to it.
+      const resized = boards.clientWidth !== state.boardsWidth || (following() && boards.clientHeight !== state.boardsHeight);
+      if (boards.hidden || !resized) return;
+      renderBoards();
+      renderStaff();
+      markPlaying();
     });
   }).observe($('#boards'));
 }

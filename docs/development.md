@@ -180,7 +180,7 @@ It runs the Tauri CLI's `icon` command twice and copies only the files `src-taur
 
 ## Debugging
 
-- `Ctrl+Shift+I` (`Cmd+Option+I` on macOS) opens devtools in dev builds.
+- `Ctrl+Shift+I` (`Cmd+Option+I` on macOS) opens devtools in dev builds. The app hides the web view's right-click menu; Shift+right-click shows it, with Inspect.
 - Release builds on Windows have no console (`windows_subsystem = "windows"`).
 - To inspect a running build from outside, start it with WebView2's debugging port, then use any CDP client (`http://127.0.0.1:9333/json/list`):
 
@@ -201,6 +201,12 @@ Before a release, on Windows and macOS:
 - Save, a name, Enter: it's under My presets. Clear, click it: it's back. Save it again under the same name: replaced, with Undo. Delete, then Undo.
 - Drop 3 and Drop 2&4 show their own string sets; double-click a set or an inversion shows only it.
 - Add `G7#5b9`: the sidebar says G7♯5♭9, voiced as G7♯5, G B D♯ F A♭; All notes outlines its ♭9s. Chord tones (or `4`): every note of each chord on the neck, Strings, Inversions, Voice leading and All notes dimmed in place, the toolbar no taller. `1` brings the voicings back with their pins.
+- Scales (or `S`): each board outlines its scale, the picker over it names it (D Dorian, G Mixolydian, C Ionian for ii–V–I); choose G altered and the board and its notes follow.
+- Set G7 to ½ bar: the staff (Staff, at the bottom) has Dm7 for a bar, G7 a half note, Cmaj7 a half note tied to a whole note tied to a half note. Pin a voicing: its notes turn black on the staff. Scales above the staff: each scale from its root.
+- Play (or Space): a bar of clicks, then each chord sounds as it starts; its row, board and bar are marked, the others rest. Tempo changes at once; without Loop it stops after the last chord.
+- The sound button (Ambient): its card offers Off, Pluck, Ambient, Warm pad, Strings and Organ; a pad holds each chord to its end and melts into the next; Space and Volume change while it plays; Bass adds the root under it. A click elsewhere or `Esc` closes the card; Stop fades the pad.
+- Fit with ii–V–I: three boards fill the pane; with a dozen chords they're as small as they get and scroll. Play with Follow: the chord playing and the next one, filling the window; Stop brings them all back.
+- Right-click on a board or the sidebar: no menu. In Add chords: Cut, Copy, Paste.
 - Point at a dot and at a line: the voicings light up, the fret is shaded on every board, the heading shows inversion and frets. Click: pinned, frets under the chord in the sidebar.
 - Voice leading on, click a Dm7 voicing: G7 and Cmaj7 follow on the same strings. Add a chord: it follows too. `Esc` clears.
 - Overlay: one board, chords side by side where they share a spot, the path under the board.
@@ -208,5 +214,5 @@ Before a release, on Windows and macOS:
 - Settings: each link opens in the browser.
 - Remove a chord and Clear, then Undo (button and `Z`).
 - Settings: Light / Dark / System change the window and the page; left-handed and open strings off redraw the boards. Frets 24, next to Height, does too.
-- Quit and start again: progression, My presets, choices, pins and appearance are kept.
+- Quit and start again: progression (with lengths and scales), My presets, choices, pins, tempo and appearance are kept.
 - Windows: drag the window by the toolbar and the brand, double-click to maximize, the three buttons work and dim when the window is in the background. macOS: the window buttons sit on the toolbar's first row; in full screen the brand moves up.

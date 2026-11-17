@@ -4,6 +4,15 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+- Scales: turn them on, and each fretboard shows a scale to improvise over its chord, around the chord's notes, with the other notes named as tensions (9, 11, 13, ♭9…). Choose another over the fretboard; ready-made progressions start with the usual one for each chord's place in the key.
+- Each chord has a length, from half a bar to four bars, at the end of its notes in the sidebar. In the ready-made ii–V–I and ii–V–i, the last chord lasts two bars.
+- Staff: the progression above the fretboards, a bar every four beats, with each chord's pinned voicing (with Voice leading, the whole path), its notes, or its scale.
+- Play: a metronome plays the progression round and round at the tempo you choose, with a bar of count-in; the chord playing stands out everywhere. Space starts and stops it.
+- The chords sound as they play: held for their whole length by a pad to improvise over (Ambient, Warm pad, Strings or Organ), or plucked once, with reverb, volume and a bass note to choose, behind the sound button in the metronome bar.
+- Fit, next to Height: the fretboards as tall as the window allows with all of them showing.
+- Follow, in the metronome bar: while playing, only the chord playing and the next one, as tall as the window allows.
+- A right-click no longer opens the web page's menu (Back, Reload, Print); text fields keep Cut, Copy and Paste.
+
 ## 0.1.2 (2026-11-17)
 
 - Chord tones, next to Drop 2, Drop 3 and Drop 2&4 (or press 4): every note of each chord on the whole neck, without voicings. Your pinned voicings come back when you choose a drop type again.

@@ -29,8 +29,9 @@ flowchart LR
 | `src/index.html` | The sidebar (brand, progression, Add chords and its suggestions, Presets, My presets, Settings), the toolbar, the fretboards' pane, Settings, the toast, the Windows window buttons |
 | `src/styles.css` | Theme tokens (light, dark), layout, the fretboard's colors (see [ui.md](ui.md)) |
 | `src/app.js` | One `state` object, rendering, events, saving through Rust or localStorage, the title bar |
-| `src/theory.js` | Pure music theory with no DOM: qualities, spelling, drop voicings, voice leading, chord symbols, ready-made progressions (see [theory.md](theory.md)) |
+| `src/theory.js` | Pure music theory with no DOM: qualities, spelling, drop voicings, voice leading, chord symbols and all their notes, scales over chords, lengths, ready-made progressions (see [theory.md](theory.md)) |
 | `src/fretboard.js` | SVG markup for a board, its notes and voicing shapes, and the fret numbers (see [ui.md](ui.md#fretboard)) |
+| `src/staff.js` | SVG markup for the progression on a staff (see [ui.md](ui.md#staff)) |
 | `src-tauri/src/main.rs` | Creates the window in the saved theme, with the app's own title bar; the commands |
 | `src-tauri/src/settings.rs` | `Store`: reads and writes `settings.json` |
 | `src-tauri/src/update.rs` | `check_update` and `install_update`, and on macOS opening the app again after an update (see [development.md](development.md#updates)) |
@@ -65,7 +66,7 @@ When `window.__TAURI__` is missing (the page in a plain browser), `app.js` saves
 | --- | --- | --- |
 | Appearance and the page's state | `<app data>/settings.json` | `{ "theme": "system", "ui": { ... } }`; missing fields get defaults, an unreadable file gives the defaults |
 
-`ui` is what `app.js` keeps in `state.ui`: the chords (`{ id, root: { letter, acc }, quality, role, text, approx, hidden }`), the progression's name that Save offers (`title`), My presets (`saved`: `{ id, name, chords }`, the chords without `id` and `hidden`, and `nextPresetId`), the key for Presets, voicings or Chord tones (`mode`), the drop type, the chosen string sets per drop type, the inversions, labels, view, each view's height (`heights`, px between strings), voice leading, All notes (`allNotes`), the pins (chord id → voicing id) and the chord voice leading starts from (`anchor`), and the fretboard settings (frets, left-handed, open strings). `sanitize()` checks each field when it's read, so a file from an older or newer version still opens.
+`ui` is what `app.js` keeps in `state.ui`: the chords (`{ id, root: { letter, acc }, quality, role, text, approx, hidden, beats, scale }`, `scale` only once one is chosen), the progression's name that Save offers (`title`), My presets (`saved`: `{ id, name, chords }`, the chords without `id` and `hidden`, and `nextPresetId`), the key for Presets, voicings or Chord tones (`mode`), the drop type, the chosen string sets per drop type, the inversions, labels, view, each view's height (`heights`, px between strings), voice leading, All notes (`allNotes`), Scales (`scales`), the staff (`staff`, and `staffShows`: chords or scales), the metronome (`bpm`, `countIn`, `loop`, `click`, `follow`), the chords' sound (`sound`: off, pluck or a pad, and `space`, `volume`, `bass`), the pins (chord id → voicing id) and the chord voice leading starts from (`anchor`), and the fretboard settings (frets, left-handed, open strings). `sanitize()` checks each field when it's read, so a file from an older or newer version still opens.
 
 The page saves 300 ms after the last change. The file is written to `settings.json.tmp` and then renamed, so a crash can't leave half a file.
 
