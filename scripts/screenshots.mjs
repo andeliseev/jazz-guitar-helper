@@ -1,6 +1,6 @@
 // Renders the README's screenshots, docs/images/screenshot-light.png and screenshot-dark.png, from
 // src/ in headless Edge or Chrome: the ii–V–I in C with a voice-led path pinned in the middle of
-// the neck. Run from the repo root after a visible UI change:
+// the neck, and two progressions under My presets. Run from the repo root after a visible UI change:
 //   node scripts/screenshots.mjs
 // Needs Node 22+ (or Node 21 with --experimental-websocket). Set BROWSER to the browser's path if
 // it isn't found.
@@ -13,10 +13,16 @@ const WIDTH = 1280;
 const HEIGHT = 820;
 const SERVE_PORT = 5179;
 const DEBUG_PORT = 9339;
+// A chord as app.js keeps it; letter is an index into C D E F G A B.
+const chord = (letter, acc, quality, role) => ({ root: { letter, acc }, quality, role });
 const STATE = {
   leading: true,
   anchor: 1,
   pins: { 1: 'drop2.4321.10-10-10-10' },
+  saved: [
+    { id: 1, name: 'Rhythm changes, A', chords: [chord(6, -1, 'maj7', 'I'), chord(4, 0, 'dom7', 'VI'), chord(0, 0, 'm7', 'ii'), chord(3, 0, 'dom7', 'V')] },
+    { id: 2, name: 'Minor blues in C', chords: [chord(0, 0, 'm6', 'i'), chord(3, 0, 'm7', 'iv'), chord(0, 0, 'm6', 'i'), chord(1, 0, 'm7b5', 'iiø'), chord(4, 0, 'dom7', 'V'), chord(0, 0, 'm6', 'i')] },
+  ],
 };
 
 if (typeof WebSocket === 'undefined') {

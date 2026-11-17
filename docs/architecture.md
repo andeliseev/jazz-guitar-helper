@@ -26,7 +26,7 @@ flowchart LR
 
 | File | Responsibility |
 | --- | --- |
-| `src/index.html` | The sidebar (brand, progression, Add chords, Quick add, Settings), the toolbar, the fretboards' pane, Settings, the toast, the Windows window buttons |
+| `src/index.html` | The sidebar (brand, progression, Add chords and its suggestions, Presets, My presets, Settings), the toolbar, the fretboards' pane, Settings, the toast, the Windows window buttons |
 | `src/styles.css` | Theme tokens (light, dark), layout, the fretboard's colors (see [ui.md](ui.md)) |
 | `src/app.js` | One `state` object, rendering, events, saving through Rust or localStorage, the title bar |
 | `src/theory.js` | Pure music theory with no DOM: qualities, spelling, drop voicings, voice leading, chord symbols, ready-made progressions (see [theory.md](theory.md)) |
@@ -65,7 +65,7 @@ When `window.__TAURI__` is missing (the page in a plain browser), `app.js` saves
 | --- | --- | --- |
 | Appearance and the page's state | `<app data>/settings.json` | `{ "theme": "system", "ui": { ... } }`; missing fields get defaults, an unreadable file gives the defaults |
 
-`ui` is what `app.js` keeps in `state.ui`: the chords (`{ id, root: { letter, acc }, quality, role, text, approx, hidden }`), the key for Quick add, the drop type, the chosen string sets per drop type, the inversions, labels, view, each view's height (`heights`, px between strings), voice leading, All notes (`allNotes`), the pins (chord id → voicing id) and the chord voice leading starts from (`anchor`), and the fretboard settings (frets, left-handed, open strings). `sanitize()` checks each field when it's read, so a file from an older or newer version still opens.
+`ui` is what `app.js` keeps in `state.ui`: the chords (`{ id, root: { letter, acc }, quality, role, text, approx, hidden }`), the progression's name that Save offers (`title`), My presets (`saved`: `{ id, name, chords }`, the chords without `id` and `hidden`, and `nextPresetId`), the key for Presets, the drop type, the chosen string sets per drop type, the inversions, labels, view, each view's height (`heights`, px between strings), voice leading, All notes (`allNotes`), the pins (chord id → voicing id) and the chord voice leading starts from (`anchor`), and the fretboard settings (frets, left-handed, open strings). `sanitize()` checks each field when it's read, so a file from an older or newer version still opens.
 
 The page saves 300 ms after the last change. The file is written to `settings.json.tmp` and then renamed, so a crash can't leave half a file.
 

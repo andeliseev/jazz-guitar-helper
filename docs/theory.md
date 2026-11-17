@@ -92,6 +92,15 @@ A plain major triad becomes a 6 chord because that's how jazz players usually vo
 
 `parseChords` splits a line on spaces, commas, semicolons and bar lines (`|`), keeps commas inside parentheses (`C7(♭9, ♯11)`), skips repeat signs (`%`), and returns what didn't read in `bad`.
 
+### Suggestions
+
+`suggestChords(token)` is what Add chords suggests while a symbol is typed. It reads the root as `parseChord` does, normalizes what follows it, and lists:
+
+1. Each quality with a way of writing it (`EXACT`) that starts with what's typed, in `QUALITIES` order: `Dm7`, described as "minor 7th · D–7". The short form (`SHORTHAND`) is added only where it teaches a sign: Δ, –, ø, o, sus, +.
+2. Once something follows the root, common chords the app shows as the nearest one (`NEARBY`: maj9, maj7♯11, 9, 13, 7♭9, 7♯9, 7♯11, 7♭13, 7alt, m9, m11, 69, 9sus4, add9), with `approx: true` and what they're shown as: `Dm9`, "shown as Dm7".
+
+A lone `m` means minor, so it doesn't suggest maj chords. At most 12 (`limit`). Every suggestion reads back with `parseChord` as the quality and `approx` it was listed with; the tests check that.
+
 ## Ready-made progressions
 
 `PRESETS` are written as scale degrees, qualities and roman numerals, and `presetChords(id, key)` spells them in a key from `KEYS`:

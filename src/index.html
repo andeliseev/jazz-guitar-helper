@@ -17,22 +17,38 @@
 
       <div class="side-head">
         <span class="side-title">Progression</span>
-        <button id="clear" class="link-btn" title="Remove all chords">Clear</button>
+        <span class="head-actions">
+          <button id="save-preset" class="link-btn" title="Keep this progression under My presets">Save</button>
+          <button id="clear" class="link-btn" title="Remove all chords">Clear</button>
+        </span>
       </div>
       <!-- One row per chord (renderSidebar): its color, name, notes and the pinned voicing's frets. -->
       <div id="chords"></div>
       <form id="add-form" class="add-row" autocomplete="off">
-        <input id="add-input" placeholder="Add chords: Dm7 G7 Cmaj7" aria-label="Add chords" spellcheck="false">
+        <input id="add-input" placeholder="Add chords: Dm7 G7 Cmaj7" aria-label="Add chords" spellcheck="false"
+               role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false">
         <button type="submit" class="icon-btn" title="Add (Enter)" aria-label="Add">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
         </button>
+        <!-- Chords that fit the one being typed (renderSuggestions). -->
+        <div id="suggest" class="suggest" role="listbox" aria-label="Chord suggestions" hidden></div>
       </form>
 
       <div class="side-head">
-        <span class="side-title">Quick add</span>
+        <span class="side-title">Presets</span>
         <label class="key-pick">in <select id="key" aria-label="Key"></select></label>
       </div>
+      <!-- A click puts a preset in place of the progression; its + adds it to the end. -->
       <div id="presets" class="presets"></div>
+
+      <div class="side-head">
+        <span class="side-title">My presets</span>
+      </div>
+      <!-- The name field while saving (Save), then the progressions saved (renderSaved). -->
+      <form id="save-form" class="save-row" autocomplete="off" hidden>
+        <input id="save-name" aria-label="Name for the preset" placeholder="Name" spellcheck="false">
+      </form>
+      <div id="saved"></div>
 
       <div class="spacer"></div>
       <button id="open-settings" class="side-btn">
@@ -85,6 +101,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="1.2"/><circle cx="12" cy="6" r="1.2"/><circle cx="18" cy="6" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/><circle cx="6" cy="18" r="1.2"/><circle cx="12" cy="18" r="1.2"/><circle cx="18" cy="18" r="1.2"/></svg>
             All notes
           </button>
+          <label class="height-pick" title="How many frets the fretboards show">
+            <span class="group-label">Frets</span>
+            <select id="frets" aria-label="Frets"></select>
+          </label>
           <label class="height-pick" title="How tall the fretboards are; Stacked and Overlay each keep their own. Double-click to reset.">
             <span class="group-label">Height</span>
             <input id="height" type="range" min="16" max="44" step="1" aria-label="Fretboard height">
@@ -127,10 +147,6 @@
 
       <section>
         <h3>Fretboard</h3>
-        <div class="setting-row">
-          <span>Frets</span>
-          <div id="frets" class="segmented" role="radiogroup" aria-label="Frets"></div>
-        </div>
         <label class="setting-row switch">
           <span>Left-handed <small class="muted">The nut on the right</small></span>
           <input id="left-handed" type="checkbox">

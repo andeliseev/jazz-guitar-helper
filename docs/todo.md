@@ -3,7 +3,6 @@
 ## Not verified yet
 
 - The macOS build: the title bar (window buttons centered on the toolbar's first row, the brand under them, full screen), WKWebView rendering of the SVG boards, and the `.dmg` from the Release workflow. Everything so far was checked on Windows 11 (WebView2) and in Chromium.
-- The Release workflow hasn't run to the end yet (see [development.md](development.md#releases-github-actions)).
 - Updates end to end: no release has been updated from yet. The first real test is 0.1.0 updating to the next version, on Windows and macOS (the relaunch after a Mac update is Unified Mail's, which works there). The Mac app is only ad-hoc signed, while Unified Mail updates itself with its own certificate. If macOS asks anything when this app updates itself, sign it with that certificate the way Unified Mail's workflow does (its `APPLE_CERTIFICATE` and `APPLE_CERTIFICATE_PASSWORD` secrets, rcodesign, `signingIdentity` in `tauri.release.conf.json`).
 - Windows 10: the window buttons' glyphs fall back to Segoe MDL2 Assets there.
 
@@ -11,7 +10,9 @@
 
 - Voice leading is greedy from the anchor; it doesn't search for the best path over the whole progression, and never changes string set. A "best path" option could compare all starting voicings.
 - Voice leading needs every chord on the anchor's strings; with several string sets shown it stays on the anchor's.
-- A chord can only be changed by typing its symbol again (double-click). A menu of qualities and roots, and dragging chords to reorder them, would be quicker.
+- A chord can only be changed by typing its symbol again (double-click). A menu of qualities and roots would be quicker.
+- My presets can't be renamed or reordered (save under a new name, then delete the old one), and stay in the key they were saved in: there's no transposing them, or the progression, to another key.
+- Suggestions follow what's typed, not the caret: moving it with ← and → doesn't change the list until the next key typed.
 - Chords that aren't one of the twelve qualities are shown as the nearest one (Cmaj9 as Cmaj7). The extensions themselves aren't voiced.
 - Dots aren't reachable from the keyboard; pinning needs a mouse.
 - The window's size and position aren't remembered between launches.
@@ -25,14 +26,13 @@
 - **Hear it:** play a voicing or the pinned path with Web Audio (a plucked-string sound), no samples needed.
 - **Export:** the pinned path as chord diagrams (SVG or PNG) or as tab, to print or paste.
 - **Other tunings:** 7-string, DADGAD, drop D, baritone; the theory takes the tuning as a parameter already except for `TUNING`.
-- Save several progressions by name, and import a chart (iReal Pro link or a text file).
+- Import a chart (iReal Pro link or a text file), and share My presets as a file.
 - Scale degrees as labels relative to the key (for ii–V–I: the chord tones as degrees of C).
 - A Russian interface.
 
 ## Distribution
 
 - **Code signing:** the Windows SmartScreen and macOS Gatekeeper warnings at first launch go away only with paid certificates (and notarization on macOS).
-- The website's Download link goes to the GitHub Releases page, which is empty until the first release.
 
 ## Code quality
 

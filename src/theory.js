@@ -337,6 +337,43 @@ export function parseChords(text) {
   return { chords, bad };
 }
 
+// The usual short way to write a chord, shown next to its suggestion: "minor 7th · D–7". Only
+// where it teaches a sign; D–Δ and DΔ♯5 only combine signs shown on other rows.
+const SHORTHAND = { maj7: 'Δ', m7: '–7', m7b5: 'ø', dim7: 'o7', sus4: 'sus', aug7: '+7' };
+// Chords people write that the app shows as the nearest one it voices, suggested once something
+// follows the root.
+const NEARBY = ['maj9', 'maj7#11', '9', '13', '7b9', '7#9', '7#11', '7b13', '7alt', 'm9', 'm11', '69', '9sus4', 'add9'];
+const pretty = (suffix) => suffix.replace(/b/g, '♭').replace(/#/g, '♯');
+
+/**
+ * Chords to suggest while `token`, one chord symbol, is being typed: the qualities with a way of
+ * writing them that starts with what follows the root, then common chords the app shows as the
+ * nearest one (`approx`). [{ text, quality, desc, approx }], at most `limit`. A lone "m" is minor,
+ * so it doesn't suggest maj chords.
+ */
+export function suggestChords(token, limit = 12) {
+  const m = /^([A-Ga-g])(♯♯|♭♭|##|bb|♯|♭|#|b)?(.*)$/.exec(token.trim());
+  if (!m) return [];
+  const name = rootName({ letter: LETTERS.indexOf(m[1].toUpperCase()), acc: accidentalValue(m[2]) });
+  const { s } = normalize(m[3]);
+  const fits = (form) => form.startsWith(s) && !(s === 'm' && form.startsWith('maj'));
+  const found = [];
+  for (const [quality, forms] of Object.entries(EXACT)) {
+    if (!forms.some(fits)) continue;
+    const short = SHORTHAND[quality] ? ` · ${name}${SHORTHAND[quality]}` : '';
+    found.push({ text: name + QUALITIES[quality].suffix, quality, desc: QUALITIES[quality].name.toLowerCase() + short, approx: false });
+  }
+  if (s) {
+    for (const suffix of NEARBY) {
+      const form = normalize(suffix).s;
+      if (!fits(form)) continue;
+      const quality = nearest(form);
+      found.push({ text: name + pretty(suffix), quality, desc: `shown as ${name}${QUALITIES[quality].suffix}`, approx: true });
+    }
+  }
+  return found.slice(0, limit);
+}
+
 /** The key a ready-made progression is in: "C", or "C♯ minor" for a minor one in D♭. */
 export function presetKey(id, key) {
   const preset = PRESETS.find((p) => p.id === id);

@@ -196,6 +196,9 @@ Before a release, on Windows and macOS:
 
 - First launch shows ii–V–I in C, Drop 2 on strings 4-3-2-1, three boards.
 - Type `Bbmaj9 Eø A7b9 H7` in Add chords: three chords are added (B♭maj7 "from Bbmaj9", Em7♭5, A7 "from A7b9"), `H7` stays in the field with a message.
+- Type `Dm`: suggestions Dm7 to Dm11. ↓ ↓ Enter adds Dm7♭5; `G7b` then Tab gives `G7♭5 ` and the list closes; a click on a suggestion adds it; `Esc` closes the list, a second `Esc` leaves the field.
+- Click I–vi–ii–V under Presets: it replaces the progression; Undo brings it back. Its + adds it to the end.
+- Save, a name, Enter: it's under My presets. Clear, click it: it's back. Save it again under the same name: replaced, with Undo. Delete, then Undo.
 - Drop 3 and Drop 2&4 show their own string sets; double-click a set or an inversion shows only it.
 - Point at a dot and at a line: the voicings light up, the fret is shaded on every board, the heading shows inversion and frets. Click: pinned, frets under the chord in the sidebar.
 - Voice leading on, click a Dm7 voicing: G7 and Cmaj7 follow on the same strings. Add a chord: it follows too. `Esc` clears.
@@ -203,6 +206,6 @@ Before a release, on Windows and macOS:
 - All notes: outlined dots for every other note of each chord on all six strings; they don't react to the mouse. Height: the boards follow the slider; Stacked and Overlay keep their own; double-click resets.
 - Settings: each link opens in the browser.
 - Remove a chord and Clear, then Undo (button and `Z`).
-- Settings: Light / Dark / System change the window and the page; 24 frets, left-handed and open strings off redraw the boards.
-- Quit and start again: progression, choices, pins and appearance are kept.
+- Settings: Light / Dark / System change the window and the page; left-handed and open strings off redraw the boards. Frets 24, next to Height, does too.
+- Quit and start again: progression, My presets, choices, pins and appearance are kept.
 - Windows: drag the window by the toolbar and the brand, double-click to maximize, the three buttons work and dim when the window is in the background. macOS: the window buttons sit on the toolbar's first row; in full screen the brand moves up.

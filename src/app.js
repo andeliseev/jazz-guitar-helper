@@ -15,6 +15,7 @@ import {
   parseChords,
   presetChords,
   presetKey,
+  suggestChords,
   voiceLead,
   voicings,
 } from './theory.js';
@@ -32,6 +33,8 @@ const MAX_DOT_RADIUS = 14;
 const RULER_HEIGHT = 22;
 const SAVE_DELAY_MS = 300;
 const TOAST_MS = 6000;
+// A press on a chord's row that moves further than this, in px, drags the row.
+const DRAG_START = 4;
 // Asking GitHub for a newer release: a little after launch, then this often while the app runs;
 // opening Settings always asks too.
 const FIRST_UPDATE_CHECK_MS = 10 * 1000;
@@ -45,9 +48,8 @@ const IS_WINDOWS = navigator.userAgent.includes('Windows');
 const ICONS = {
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
-  up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',
-  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
   remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -109,6 +111,11 @@ function defaultUi() {
   return {
     chords: presetChords('ii-V-I', 'C').map((chord, i) => ({ ...chord, id: i + 1 })),
     nextId: 4,
+    // The name of the preset loaded last, offered when saving (Save).
+    title: 'ii–V–I in C',
+    // My presets: { id, name, chords } with the chords as the progression keeps them, minus ids.
+    saved: [],
+    nextPresetId: 1,
     key: 'C',
     drop: 'drop2',
     sets: { drop2: ['4321'], drop3: ['6432'], drop24: ['6532'] },
@@ -120,9 +127,10 @@ function defaultUi() {
     // Every note of each chord on the neck, besides its voicings.
     allNotes: false,
     // The pinned voicing of each chord (chord id → voicing id), and the chord last clicked,
-    // which voice leading starts from.
+    // which voice leading starts from; `autoAnchor` when the app chose it (startPath).
     pins: {},
     anchor: null,
+    autoAnchor: false,
     frets: 15,
     leftHanded: false,
     openStrings: true,
@@ -135,20 +143,22 @@ function sanitize(saved) {
   if (!saved || typeof saved !== 'object') return ui;
   if (Array.isArray(saved.chords)) {
     ui.chords = saved.chords
-      .filter((c) => c && Number.isInteger(c.id) && c.root && Number.isInteger(c.root.letter) && Number.isInteger(c.root.acc))
-      .filter((c) => c.root.letter >= 0 && c.root.letter < 7 && Math.abs(c.root.acc) <= 2)
-      .filter((c) => chordTonesOk(c))
-      .map((c) => ({
-        id: c.id,
-        root: { letter: c.root.letter, acc: c.root.acc },
-        quality: c.quality,
-        role: typeof c.role === 'string' ? c.role : '',
-        text: typeof c.text === 'string' ? c.text : undefined,
-        approx: !!c.approx,
-        hidden: !!c.hidden,
-      }));
+      .filter((c) => Number.isInteger(c?.id))
+      .map((c) => {
+        const chord = cleanChord(c);
+        return chord && { id: c.id, ...chord, hidden: !!c.hidden };
+      })
+      .filter(Boolean);
   }
   ui.nextId = Math.max(Number.isInteger(saved.nextId) ? saved.nextId : 1, ...ui.chords.map((c) => c.id + 1), 1);
+  ui.title = typeof saved.title === 'string' ? saved.title : '';
+  if (Array.isArray(saved.saved)) {
+    ui.saved = saved.saved
+      .filter((p) => p && Number.isInteger(p.id) && typeof p.name === 'string' && p.name.trim() && Array.isArray(p.chords))
+      .map((p) => ({ id: p.id, name: p.name.trim(), chords: p.chords.map(cleanChord).filter(Boolean) }))
+      .filter((p) => p.chords.length);
+  }
+  ui.nextPresetId = Math.max(Number.isInteger(saved.nextPresetId) ? saved.nextPresetId : 1, ...ui.saved.map((p) => p.id + 1), 1);
   if (KEYS.includes(saved.key)) ui.key = saved.key;
   if (DROPS[saved.drop]) ui.drop = saved.drop;
   for (const drop of Object.keys(DROPS)) {
@@ -172,10 +182,25 @@ function sanitize(saved) {
     for (const [id, pin] of Object.entries(saved.pins)) if (typeof pin === 'string') ui.pins[id] = pin;
   }
   if (Number.isInteger(saved.anchor)) ui.anchor = saved.anchor;
+  ui.autoAnchor = !!saved.autoAnchor;
   if (FRET_CHOICES.includes(saved.frets)) ui.frets = saved.frets;
   ui.leftHanded = !!saved.leftHanded;
   ui.openStrings = saved.openStrings !== false;
   return ui;
+}
+
+/** A chord as the progression and My presets keep it, from saved data; null when it isn't one. */
+function cleanChord(c) {
+  if (!c?.root || !Number.isInteger(c.root.letter) || !Number.isInteger(c.root.acc)) return null;
+  if (c.root.letter < 0 || c.root.letter > 6 || Math.abs(c.root.acc) > 2) return null;
+  const chord = {
+    root: { letter: c.root.letter, acc: c.root.acc },
+    quality: c.quality,
+    role: typeof c.role === 'string' ? c.role : '',
+    text: typeof c.text === 'string' ? c.text : undefined,
+    approx: !!c.approx,
+  };
+  return chordTonesOk(chord) ? chord : null;
 }
 
 function chordTonesOk(chord) {
@@ -225,21 +250,39 @@ function computeRows() {
     if (chord.hidden) return;
     state.rows.push({ chord, cls: `c${index % COLORS}`, tones: chordTones(chord), voicings: chordVoicings(chord) });
   });
-  if (ui.leading) relead();
+  // A path whose start isn't drawn any more (another drop type, other strings, its chord hidden or
+  // removed) starts again from the first chord. With nothing pinned there's no path to keep.
+  if (ui.leading && !relead() && Object.keys(ui.pins).length) startPath();
 }
 
-/** With voice leading on: the other chords' pins follow the pinned voicing of the anchor chord. */
+/**
+ * With voice leading on: the other chords' pins follow the pinned voicing of the anchor chord.
+ * False when that voicing isn't drawn, so there's nothing to lead from.
+ */
 function relead() {
   const { ui } = state;
   const anchor = state.rows.findIndex((row) => row.chord.id === ui.anchor);
-  if (anchor < 0) return;
+  if (anchor < 0) return false;
   const start = state.rows[anchor].voicings.find((v) => v.id === ui.pins[ui.anchor]);
-  if (!start) return;
+  if (!start) return false;
   const path = voiceLead(state.rows.map((row) => row.voicings), anchor, start);
   ui.pins = {};
   path.forEach((v, i) => {
     if (v) ui.pins[state.rows[i].chord.id] = v.id;
   });
+  return true;
+}
+
+/** A path from the first chord's lowest voicing, for when there's no voicing to start from. */
+function startPath() {
+  const { ui } = state;
+  const row = state.rows.find((r) => r.voicings.length);
+  ui.pins = {};
+  ui.anchor = row ? row.chord.id : null;
+  ui.autoAnchor = !!row;
+  if (!row) return;
+  ui.pins[row.chord.id] = row.voicings[0].id;
+  relead();
 }
 
 function pinnedVoicing(chord) {
@@ -261,11 +304,42 @@ function renderSidebar() {
   const { ui } = state;
   $('#chords').replaceChildren(...ui.chords.map((chord, index) => chordItem(chord, index)));
   $('#clear').hidden = ui.chords.length === 0;
+  $('#save-preset').hidden = ui.chords.length === 0;
   $('#key').value = ui.key;
-  for (const button of $$('#presets button')) {
-    const preset = PRESETS.find((p) => p.id === button.dataset.preset);
-    button.title = `Add ${preset.name} in ${presetKey(preset.id, ui.key)}`;
+  for (const item of $$('#presets .preset')) {
+    const preset = PRESETS.find((p) => p.id === item.dataset.preset);
+    const title = `${preset.name} in ${presetKey(preset.id, ui.key)}`;
+    item.querySelector('.load').title = `Put ${title} in place of the progression`;
+    item.querySelector('.append').title = `Add ${title} to the end`;
+    item.querySelector('.append').setAttribute('aria-label', `Add ${title} to the end`);
   }
+  renderSaved();
+}
+
+/** My presets: a row per saved progression, its name and chords, with + and Delete under the mouse. */
+function renderSaved() {
+  $('#saved').replaceChildren(
+    ...state.ui.saved.map((preset) => {
+      const item = el('div', 'saved-item');
+      item.dataset.id = preset.id;
+      item.title = `Put “${preset.name}” in place of the progression`;
+      item.append(el('div', 'saved-name', preset.name), el('div', 'saved-chords', preset.chords.map(chordName).join(' ')));
+      const actions = el('div', 'item-actions');
+      actions.append(actionButton('append', ICONS.plus, 'Add to the end'), actionButton('delete', ICONS.remove, 'Delete', 'danger'));
+      item.append(actions);
+      return item;
+    }),
+  );
+}
+
+/** A small button over a row's right end; the row's click handler reads `data-action`. */
+function actionButton(action, icon, title, className) {
+  const b = el('button', className);
+  b.dataset.action = action;
+  b.innerHTML = icon;
+  b.title = title;
+  b.setAttribute('aria-label', title);
+  return b;
 }
 
 function chordItem(chord, index) {
@@ -285,31 +359,88 @@ function chordItem(chord, index) {
     frets.title = `${inversionName(pinned)}, pinned`;
     item.append(frets);
   }
-  item.append(itemActions(chord, index));
+  item.title = 'Drag to move it in the progression';
+  item.append(itemActions(chord));
   return item;
 }
 
-function itemActions(chord, index) {
+function itemActions(chord) {
   const box = el('div', 'item-actions');
-  const button = (action, icon, title, className) => {
-    const b = el('button', className);
-    b.dataset.action = action;
-    b.innerHTML = icon;
-    b.title = title;
-    b.setAttribute('aria-label', title);
-    return b;
-  };
-  const up = button('up', ICONS.up, 'Move up');
-  const down = button('down', ICONS.down, 'Move down');
-  up.disabled = index === 0;
-  down.disabled = index === state.ui.chords.length - 1;
   box.append(
-    button('hide', chord.hidden ? ICONS.eyeOff : ICONS.eye, chord.hidden ? 'Show on the fretboard' : 'Hide from the fretboard'),
-    up,
-    down,
-    button('remove', ICONS.remove, 'Remove', 'danger'),
+    actionButton('hide', chord.hidden ? ICONS.eyeOff : ICONS.eye, chord.hidden ? 'Show on the fretboard' : 'Hide from the fretboard'),
+    actionButton('remove', ICONS.remove, 'Remove', 'danger'),
   );
   return box;
+}
+
+/**
+ * Dragging a chord's row moves it in the progression. A press that moves less than DRAG_START px
+ * stays a click (its fretboard comes into view; a double-click on the name edits it). The row
+ * follows the pointer and an accent line shows where it will go; Esc puts it back.
+ */
+function initChordDrag() {
+  const list = $('#chords');
+  let drag = null;
+
+  const finish = (drop) => {
+    const d = drag;
+    drag = null;
+    if (!d?.active) return;
+    // The click that ends a drag isn't one.
+    state.suppressClick = true;
+    document.documentElement.classList.remove('dragging-chord');
+    d.line.remove();
+    // `to` counts the slots before the dragged row too; take it out.
+    const to = d.to > d.from ? d.to - 1 : d.to;
+    if (drop && to !== d.from) {
+      moveChordTo(d.from, to);
+    } else {
+      d.item.classList.remove('dragging');
+      d.item.style.transform = '';
+    }
+  };
+
+  list.addEventListener('pointerdown', (e) => {
+    state.suppressClick = false;
+    const item = e.target.closest('.chord-item');
+    if (e.button !== 0 || !item || e.target.closest('button, input')) return;
+    drag = { item, pointerId: e.pointerId, startY: e.clientY, active: false };
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const dy = e.clientY - drag.startY;
+    if (!drag.active) {
+      if (Math.abs(dy) < DRAG_START) return;
+      drag.active = true;
+      drag.items = [...list.querySelectorAll('.chord-item')];
+      drag.rects = drag.items.map((n) => n.getBoundingClientRect());
+      drag.from = drag.items.indexOf(drag.item);
+      drag.item.classList.add('dragging');
+      document.documentElement.classList.add('dragging-chord');
+      drag.line = el('div', 'drop-line');
+      list.append(drag.line);
+    }
+    drag.item.style.transform = `translateY(${dy}px)`;
+    // The slot before the first row whose middle is below the pointer.
+    const at = drag.rects.findIndex((r) => e.clientY < r.top + r.height / 2);
+    drag.to = at < 0 ? drag.items.length : at;
+    const edge = drag.to < drag.rects.length ? drag.rects[drag.to].top : drag.rects[drag.rects.length - 1].bottom;
+    drag.line.style.top = `${edge - list.getBoundingClientRect().top - 1}px`;
+    // No line where the row already is.
+    drag.line.hidden = drag.to === drag.from || drag.to === drag.from + 1;
+  });
+  document.addEventListener('pointerup', (e) => {
+    if (drag && e.pointerId === drag.pointerId) finish(true);
+  });
+  document.addEventListener('pointercancel', (e) => {
+    if (drag && e.pointerId === drag.pointerId) finish(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drag?.active) {
+      e.stopImmediatePropagation();
+      finish(false);
+    }
+  }, true);
 }
 
 function renderToolbar() {
@@ -332,6 +463,7 @@ function renderToolbar() {
   $('#leading').setAttribute('aria-pressed', String(ui.leading));
   $('#all-notes').setAttribute('aria-pressed', String(ui.allNotes));
   $('#height').value = ui.heights[ui.view];
+  $('#frets').value = String(ui.frets);
 }
 
 function renderBoards() {
@@ -540,11 +672,13 @@ function setPin(chordId, voicingId) {
   if (voicingId) {
     ui.pins[chordId] = voicingId;
     ui.anchor = chordId;
+    ui.autoAnchor = false;
     if (ui.leading) relead();
   } else if (ui.leading) {
     // The path comes from one voicing, so it goes as a whole.
     ui.pins = {};
     ui.anchor = null;
+    ui.autoAnchor = false;
   } else {
     delete ui.pins[chordId];
   }
@@ -556,6 +690,7 @@ function setPin(chordId, voicingId) {
 function clearPins() {
   state.ui.pins = {};
   state.ui.anchor = null;
+  state.ui.autoAnchor = false;
   renderSidebar();
   restyle();
   scheduleSave();
@@ -563,12 +698,202 @@ function clearPins() {
 
 // The progression
 
+/** The progression's form of a chord read or loaded: a new id, and what was typed only when shown as the nearest. */
+function newChord(c) {
+  return { id: state.ui.nextId++, root: { ...c.root }, quality: c.quality, role: c.role || '', text: c.approx ? c.text : undefined, approx: !!c.approx };
+}
+
 function addChords(chords) {
   const { ui } = state;
-  for (const c of chords) {
-    ui.chords.push({ id: ui.nextId++, root: c.root, quality: c.quality, role: c.role || '', text: c.approx ? c.text : undefined, approx: !!c.approx });
-  }
+  // Chords typed into an empty progression start a new one, with no name yet.
+  if (!ui.chords.length) ui.title = '';
+  for (const c of chords) ui.chords.push(newChord(c));
   render();
+}
+
+/**
+ * A preset's chords in place of the progression, or with `append` after it; a toast, naming it
+ * `label`, offers Undo. Replacing starts with no voicing pinned, and `title` becomes the name
+ * Save offers (so does adding to an empty progression).
+ */
+function loadChords(chords, title, append, label = title) {
+  const { ui } = state;
+  const before = { chords: ui.chords, pins: ui.pins, anchor: ui.anchor, autoAnchor: ui.autoAnchor, title: ui.title };
+  const loaded = chords.map(newChord);
+  if (append && ui.chords.length) ui.chords = [...ui.chords, ...loaded];
+  else Object.assign(ui, { chords: loaded, pins: {}, anchor: null, autoAnchor: false, title });
+  render();
+  toast(`${append ? 'Added' : 'Loaded'} ${label}`, 'Undo', () => {
+    Object.assign(state.ui, before);
+    render();
+  });
+}
+
+function loadPreset(id, append) {
+  const preset = PRESETS.find((p) => p.id === id);
+  loadChords(presetChords(id, state.ui.key), `${preset.name} in ${presetKey(id, state.ui.key)}`, append);
+}
+
+function loadSaved(id, append) {
+  const preset = state.ui.saved.find((p) => p.id === id);
+  if (preset) loadChords(preset.chords, preset.name, append, `“${preset.name}”`);
+}
+
+/** Save: a name field under My presets, with the name of the preset loaded last, or the chords. */
+function startSaving() {
+  const { ui } = state;
+  if (!ui.chords.length) return;
+  const field = $('#save-name');
+  const chords = ui.chords.map(chordName).join(' ');
+  field.value = ui.title || (chords.length > 40 ? `${chords.slice(0, 39)}…` : chords);
+  $('#save-form').hidden = false;
+  field.focus();
+  field.select();
+}
+
+function stopSaving() {
+  $('#save-form').hidden = true;
+}
+
+/** Keeps the progression under `name`; one already called that is replaced, with Undo. */
+function savePreset(name) {
+  const { ui } = state;
+  name = name.trim();
+  if (!name || !ui.chords.length) return;
+  const chords = ui.chords.map(({ id, hidden, ...chord }) => ({ ...chord, root: { ...chord.root } }));
+  const before = ui.saved;
+  const same = ui.saved.find((p) => p.name.toLowerCase() === name.toLowerCase());
+  ui.saved = same ? ui.saved.map((p) => (p === same ? { ...p, name, chords } : p)) : [...ui.saved, { id: ui.nextPresetId++, name, chords }];
+  ui.title = name;
+  stopSaving();
+  renderSaved();
+  scheduleSave();
+  toast(same ? `Replaced “${name}” in My presets` : `Saved “${name}” in My presets`, same ? 'Undo' : undefined, same ? () => {
+    state.ui.saved = before;
+    renderSaved();
+    scheduleSave();
+  } : undefined);
+}
+
+/** Add chords: reads the field; what doesn't read stays in it, and a toast says so. */
+function addFromField() {
+  const input = $('#add-input');
+  const { chords, bad } = parseChords(input.value);
+  if (chords.length) addChords(chords);
+  input.value = bad.join(' ');
+  hideSuggestions();
+  if (bad.length) toast(`Couldn't read ${bad.map((t) => `“${t}”`).join(', ')}. ${CHORD_HELP}`);
+}
+
+// Suggestions under Add chords (suggestChords in theory.js): for the chord the caret is in, the
+// chords that fit what's typed so far. ↓ and ↑ choose one; Enter or a click puts it in and adds
+// the field, Tab only puts it in (to type more), Esc closes them.
+
+/** The chord symbol being typed: from the last separator before the caret, up to the caret. */
+function typedToken(input) {
+  const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+  const token = /[^\s,;|]*$/.exec(before)[0];
+  return { token, start: before.length - token.length, end: before.length };
+}
+
+function updateSuggestions() {
+  const input = $('#add-input');
+  const { token, start, end } = typedToken(input);
+  const items = document.activeElement === input && token ? suggestChords(token) : [];
+  // One suggestion that is just what's typed adds nothing.
+  const same = items.length === 1 && parseChord(token)?.quality === items[0].quality && !items[0].approx;
+  state.suggest = { items: same ? [] : items, active: -1, start, end };
+  renderSuggestions();
+}
+
+function hideSuggestions() {
+  state.suggest = { items: [], active: -1 };
+  renderSuggestions();
+}
+
+function renderSuggestions() {
+  const { items, active } = state.suggest;
+  const box = $('#suggest');
+  const input = $('#add-input');
+  box.hidden = !items.length;
+  input.setAttribute('aria-expanded', String(items.length > 0));
+  if (active >= 0) input.setAttribute('aria-activedescendant', `suggest-${active}`);
+  else input.removeAttribute('aria-activedescendant');
+  if (!items.length) return box.replaceChildren();
+  const rows = items.map((s, i) => {
+    const row = el('div', `suggest-item${s.approx ? ' approx' : ''}${i === active ? ' active' : ''}`);
+    row.id = `suggest-${i}`;
+    row.dataset.index = i;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(i === active));
+    row.append(el('b', null, s.text), el('span', null, s.desc));
+    return row;
+  });
+  box.replaceChildren(...rows, el('div', 'suggest-hint', '↑↓ choose · Enter adds · Tab completes'));
+  box.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+}
+
+/** Puts suggestion `index` in place of the chord being typed; `add` then adds the whole field. */
+function acceptSuggestion(index, add) {
+  const input = $('#add-input');
+  const { items, start, end } = state.suggest;
+  const { text } = items[index];
+  const rest = input.value.slice(end);
+  const gap = add || /^\s/.test(rest) ? '' : ' ';
+  input.value = input.value.slice(0, start) + text + gap + rest;
+  const caret = start + text.length + gap.length;
+  input.setSelectionRange(caret, caret);
+  hideSuggestions();
+  if (add) addFromField();
+}
+
+function bindSuggestions() {
+  const input = $('#add-input');
+  state.suggest = { items: [], active: -1 };
+  input.addEventListener('input', updateSuggestions);
+  input.addEventListener('focus', updateSuggestions);
+  input.addEventListener('blur', hideSuggestions);
+  input.addEventListener('keydown', (e) => {
+    const { items, active } = state.suggest;
+    if (!items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      state.suggest.active = active < 0 && step < 0 ? items.length - 1 : (active + step + items.length) % items.length;
+      renderSuggestions();
+    } else if (e.key === 'Enter' && active >= 0) {
+      e.preventDefault();
+      acceptSuggestion(active, true);
+    } else if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      acceptSuggestion(Math.max(active, 0), false);
+    } else if (e.key === 'Escape') {
+      // Closes the suggestions only; the next Esc leaves the field.
+      e.stopPropagation();
+      hideSuggestions();
+    }
+  });
+  // A press on a suggestion keeps the field's focus, so it doesn't close first.
+  $('#suggest').addEventListener('pointerdown', (e) => {
+    const row = e.target.closest('.suggest-item');
+    e.preventDefault();
+    if (row) acceptSuggestion(Number(row.dataset.index), true);
+  });
+}
+
+function deleteSaved(id) {
+  const { ui } = state;
+  const preset = ui.saved.find((p) => p.id === id);
+  if (!preset) return;
+  const before = ui.saved;
+  ui.saved = ui.saved.filter((p) => p !== preset);
+  renderSaved();
+  scheduleSave();
+  toast(`Deleted “${preset.name}”`, 'Undo', () => {
+    state.ui.saved = before;
+    renderSaved();
+    scheduleSave();
+  });
 }
 
 function removeChord(index) {
@@ -587,8 +912,8 @@ function removeChord(index) {
 function clearChords() {
   const { ui } = state;
   if (!ui.chords.length) return;
-  const before = { chords: ui.chords, pins: ui.pins, anchor: ui.anchor };
-  Object.assign(ui, { chords: [], pins: {}, anchor: null });
+  const before = { chords: ui.chords, pins: ui.pins, anchor: ui.anchor, autoAnchor: ui.autoAnchor, title: ui.title };
+  Object.assign(ui, { chords: [], pins: {}, anchor: null, autoAnchor: false, title: '' });
   render();
   toast('Cleared the progression', 'Undo', () => {
     Object.assign(state.ui, before);
@@ -596,11 +921,11 @@ function clearChords() {
   });
 }
 
-function moveChord(index, by) {
+/** Moves the chord at `from` so it ends up at `to` (initChordDrag). */
+function moveChordTo(from, to) {
   const { chords } = state.ui;
-  const to = index + by;
-  if (to < 0 || to >= chords.length) return;
-  [chords[index], chords[to]] = [chords[to], chords[index]];
+  const [chord] = chords.splice(from, 1);
+  chords.splice(to, 0, chord);
   render();
 }
 
@@ -667,8 +992,21 @@ function toggleLabels() {
   render();
 }
 
+/**
+ * On: the path shows at once, from the voicing pinned last, or else from the first chord's lowest
+ * voicing. Off: only a voicing the user pinned stays pinned; the ones the path chose go.
+ */
 function toggleLeading() {
-  state.ui.leading = !state.ui.leading;
+  const { ui } = state;
+  ui.leading = !ui.leading;
+  if (ui.leading) {
+    if (!relead()) startPath();
+  } else {
+    const kept = !ui.autoAnchor && ui.anchor != null ? ui.pins[ui.anchor] : null;
+    ui.pins = kept ? { [ui.anchor]: kept } : {};
+    if (!kept) ui.anchor = null;
+    ui.autoAnchor = false;
+  }
   render();
 }
 
@@ -727,7 +1065,6 @@ function closeSettings() {
 
 function renderSettings() {
   for (const b of $$('#theme button')) b.setAttribute('aria-checked', String(b.dataset.theme === state.theme));
-  for (const b of $$('#frets button')) b.setAttribute('aria-checked', String(Number(b.dataset.frets) === state.ui.frets));
   $('#left-handed').checked = state.ui.leftHanded;
   $('#open-strings').checked = state.ui.openStrings;
 }
@@ -857,17 +1194,16 @@ function bindEvents() {
   document.addEventListener('keydown', onKey);
 
   // Sidebar
+  initChordDrag();
   $('#chords').addEventListener('click', (e) => {
     const item = e.target.closest('.chord-item');
-    if (!item) return;
+    if (!item || state.suppressClick) return;
     const index = state.ui.chords.findIndex((c) => c.id === Number(item.dataset.id));
     const chord = state.ui.chords[index];
     const action = e.target.closest('button[data-action]')?.dataset.action;
     if (action === 'hide') {
       chord.hidden = !chord.hidden;
       render();
-    } else if (action === 'up' || action === 'down') {
-      moveChord(index, action === 'up' ? -1 : 1);
     } else if (action === 'remove') {
       removeChord(index);
     } else if (!action && !e.target.closest('input')) {
@@ -881,23 +1217,41 @@ function bindEvents() {
   });
   $('#add-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const input = $('#add-input');
-    const { chords, bad } = parseChords(input.value);
-    if (chords.length) addChords(chords);
-    input.value = bad.join(' ');
-    if (bad.length) toast(`Couldn't read ${bad.map((t) => `“${t}”`).join(', ')}. ${CHORD_HELP}`);
+    addFromField();
   });
+  bindSuggestions();
   $('#clear').addEventListener('click', clearChords);
   $('#key').addEventListener('change', (e) => {
     state.ui.key = e.target.value;
     renderSidebar();
     scheduleSave();
   });
+  // Presets: a click puts one in place of the progression, its + adds it to the end.
   $('#presets').addEventListener('click', (e) => {
-    const button = e.target.closest('button[data-preset]');
-    if (button) addChords(presetChords(button.dataset.preset, state.ui.key));
+    const item = e.target.closest('.preset');
+    if (item) loadPreset(item.dataset.preset, !!e.target.closest('.append'));
   });
-  $('#empty-add').addEventListener('click', () => addChords(presetChords('ii-V-I', state.ui.key)));
+  $('#empty-add').addEventListener('click', () => loadPreset('ii-V-I', false));
+  // My presets: the same, and Delete; Save names the progression in a field above them.
+  $('#saved').addEventListener('click', (e) => {
+    const item = e.target.closest('.saved-item');
+    if (!item) return;
+    const id = Number(item.dataset.id);
+    const action = e.target.closest('button[data-action]')?.dataset.action;
+    if (action === 'delete') deleteSaved(id);
+    else loadSaved(id, action === 'append');
+  });
+  $('#save-preset').addEventListener('click', startSaving);
+  $('#save-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    savePreset($('#save-name').value);
+  });
+  $('#save-name').addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    stopSaving();
+  });
+  $('#save-name').addEventListener('blur', stopSaving);
   $('#open-settings').addEventListener('click', openSettings);
 
   // Toolbar. A double-click on a string set or inversion shows only that one.
@@ -961,6 +1315,10 @@ function bindEvents() {
   };
   $('#height').addEventListener('input', (e) => setHeight(Number(e.target.value)));
   $('#height').addEventListener('dblclick', () => setHeight(GAPS[state.ui.view]));
+  $('#frets').addEventListener('change', (e) => {
+    state.ui.frets = Number(e.target.value);
+    render();
+  });
 
   // Fretboards
   const boards = $('#boards');
@@ -1000,13 +1358,6 @@ function bindEvents() {
     const b = e.target.closest('button[data-theme]');
     if (b) setTheme(b.dataset.theme);
   });
-  $('#frets').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-frets]');
-    if (!b) return;
-    state.ui.frets = Number(b.dataset.frets);
-    renderSettings();
-    render();
-  });
   $('#left-handed').addEventListener('change', (e) => {
     state.ui.leftHanded = e.target.checked;
     render();
@@ -1028,19 +1379,22 @@ function fillControls() {
       return option;
     }),
   );
+  // A preset is two buttons in one pill: its name loads it, the + that shows under the mouse adds it.
   $('#presets').replaceChildren(
     ...PRESETS.map((p) => {
-      const b = el('button', null, p.name);
-      b.dataset.preset = p.id;
-      return b;
+      const item = el('div', 'preset');
+      item.dataset.preset = p.id;
+      const append = el('button', 'append');
+      append.innerHTML = ICONS.plus;
+      item.append(el('button', 'load', p.name), append);
+      return item;
     }),
   );
   $('#frets').replaceChildren(
     ...FRET_CHOICES.map((n) => {
-      const b = el('button', null, String(n));
-      b.setAttribute('role', 'radio');
-      b.dataset.frets = n;
-      return b;
+      const option = el('option', null, String(n));
+      option.value = n;
+      return option;
     }),
   );
 }

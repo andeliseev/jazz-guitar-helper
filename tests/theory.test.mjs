@@ -14,6 +14,7 @@ import {
   parseChord,
   parseChords,
   presetChords,
+  suggestChords,
   voiceLead,
   voicings,
 } from '../src/theory.js';
@@ -83,6 +84,37 @@ test('shows other chords as the nearest one it voices', () => {
     const c = chord(text);
     assert.equal(chordName(c), name, text);
     assert.equal(c.approx, true, `${text} is shown as ${name}`);
+  }
+});
+
+test('suggests chords for what is being typed', () => {
+  const texts = (token) => suggestChords(token).map((s) => s.text);
+  // A root alone: every chord the app voices.
+  assert.equal(suggestChords('D').length, 12);
+  assert.equal(texts('D')[0], 'Dmaj7');
+  // A lone m is minor: no maj chords, and the nearby ones come after.
+  assert.deepEqual(texts('Dm'), ['Dm7', 'Dm7♭5', 'Dm6', 'Dm(maj7)', 'Dm9', 'Dm11']);
+  assert.deepEqual(texts('G7b'), ['G7♭5', 'G7♭9', 'G7♭13']);
+  assert.deepEqual(texts('C+'), ['C7♯5', 'Cmaj7♯5']);
+  assert.deepEqual(texts('Bø'), ['Bm7♭5']);
+  assert.deepEqual(texts('bbΔ'), ['B♭maj7', 'B♭maj7♯5', 'B♭maj9', 'B♭maj7♯11']);
+  assert.deepEqual(texts('F#°'), ['F♯°7']);
+  assert.deepEqual(texts('H7'), []);
+  assert.deepEqual(texts(''), []);
+  // What each one is, and how a nearby one shows.
+  const [dm7] = suggestChords('Dm7');
+  assert.deepEqual(dm7, { text: 'Dm7', quality: 'm7', desc: 'minor 7th · D–7', approx: false });
+  const g9 = suggestChords('G9')[0];
+  assert.equal(g9.desc, 'shown as G7');
+  assert.equal(g9.approx, true);
+  // Every suggestion reads back as the chord it says.
+  for (const token of ['D', 'Dm', 'G7', 'Cmaj', 'Esus', 'A9']) {
+    for (const s of suggestChords(token)) {
+      const c = parseChord(s.text);
+      assert.ok(c, s.text);
+      assert.equal(c.quality, s.quality, s.text);
+      assert.equal(c.approx, s.approx, s.text);
+    }
   }
 });
 

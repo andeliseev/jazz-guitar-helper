@@ -1,6 +1,6 @@
 # UI
 
-Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTauri` exposes `window.__TAURI__`, so there's no npm package for the API either. The design follows [Unified Mail](https://github.com/andeliseev/unified-mail): the same tokens, type scale, outlined buttons, segmented controls, card dialogs and toast, and the app's own title bar. Its accent is amber instead of blue, as TorrStream Lite has its own green.
+Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTauri` exposes `window.__TAURI__`, so there's no npm package for the API either. The design follows [Unified Mail](https://github.com/andeliseev/unified-mail): the same tokens, type scale, outlined buttons, segmented controls, card dialogs and toast, and the app's own title bar. Its accent is amber instead of blue, as TorrStream Lite has its own green. One difference: a chosen segmented button or a chip that's on is tinted and in the accent color, but not bold, unlike Unified Mail's. In semibold, Segoe UI draws some glyphs differently at this size (the & of Drop 2&4 changed shape) and the button grows, moving the rest of the toolbar.
 
 | File | Contents |
 | --- | --- |
@@ -14,8 +14,8 @@ Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTau
 
 `#app` is a two-column grid: a 264 px sidebar and the main pane. Its single row is `minmax(0, 1fr)` so the fretboards scroll inside the window.
 
-- **Sidebar:** the brand, **Progression** (a row per chord, then **Add chords**), **Quick add** (a key and the ready-made progressions), and Settings at the bottom. It scrolls when the progression is long.
-- **Toolbar:** two rows. The first chooses what's voiced: the drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, and Height (a slider). When the pane is wide enough, the second row sits beside the first.
+- **Sidebar:** the brand, **Progression** (Save and Clear in its heading, a row per chord, then **Add chords** with its suggestions), **Presets** (a key and the ready-made progressions), **My presets** (the progressions saved), and Settings at the bottom. It scrolls when the progression is long.
+- **Toolbar:** two rows. The first chooses what's voiced: the drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Frets (a select: 12, 15, the default, 17, 20, 22 or 24) and Height (a slider). When the pane is wide enough, the second row sits beside the first.
 - **Fretboards** (`#boards`): fret numbers on top, sticky while the boards scroll, then a board per chord (Stacked) or one board for all (Overlay). With no chord to show, an empty state says why, with a button that adds a ii–V–I.
 
 The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width, and a new width redraws them (`ResizeObserver`). How tall they are is the user's choice (see [Height](#height)).
@@ -68,15 +68,25 @@ The Height slider sets the gap between strings, 16 to 44 px, which is how tall t
 - **Clicking** a line pins its voicing for that chord (`state.ui.pins`, chord id → voicing id); clicking it again unpins it. Clicking a note pins the first voicing using it, then the next one at each click, then none.
 - A chord with a pin dims its other voicings; the pinned one keeps a strong line and outlined dots. Its frets show under the chord in the sidebar.
 - **Voice leading** on: the chord last clicked is the `anchor`, and every render takes the other chords' pins from `voiceLead` (see [theory.md](theory.md#voice-leading)). So adding a chord, hiding one or changing the string sets keeps the path following the anchor. Unpinning anything clears the whole path, since it all comes from one voicing.
+  - Turning it on shows a path at once (`toggleLeading`): from the voicing pinned last, or with none, from the first chord's lowest voicing (`startPath`, which marks the anchor `autoAnchor`).
+  - When the anchor's voicing isn't drawn any more (another drop type or string set, its chord hidden, changed or removed), the path starts again from the first chord, so voice leading always shows one. After the user unpins everything, it waits for a click.
+  - Turning it off keeps only the anchor's pin, and only when the user pinned it; the pins the path chose, and an anchor the app chose, go.
 - Pins are voicing ids, which include the drop type and strings, so a pin only shows while its voicing is drawn, and comes back when it is again.
 - `Esc` unpins everything.
 
 ## The progression
 
 - **Add chords** reads the field with `parseChords`; what doesn't read stays in the field and a toast says what it was.
-- **Quick add** appends a ready-made progression in the chosen key; the buttons' tooltips say the key (C♯ minor for ii–V–i in D♭).
-- A chord's row shows its color, name, roman numeral, what was typed when it's shown as the nearest chord ("from Cmaj9"), its notes and its pinned frets. Under the mouse it shows Hide / Show, Move up, Move down and Remove. A double-click on the name puts a field in its place; Enter or leaving the field reads it, `Esc` cancels. A new chord loses the roman numeral and the pin.
-- **Remove** and **Clear** show a toast with **Undo** (also `Z`) instead of asking first, as in Unified Mail.
+- **Suggestions** (`renderSuggestions`, from `suggestChords` in [theory.md](theory.md#suggestions)): while typing, a list under the field shows the chords that fit the symbol the caret is in, up to 12. The ones the app voices come first, bold, named in full; the ones it shows as the nearest (`Dm9`) are in regular weight and say what they're shown as. One suggestion that is just what's typed isn't shown.
+  - ↓ and ↑ choose one; none is chosen at first, so Enter still adds what's typed. Enter or a click puts the chosen one in place of the symbol and adds the field. Tab puts it in (the first one when none is chosen) with a space after, to type the next chord. `Esc` closes the list, and a second `Esc` leaves the field. A press on the list doesn't take the focus from the field.
+  - The field is a combobox: `aria-expanded`, `aria-controls` the list (`role="listbox"`), and `aria-activedescendant` the chosen row.
+  - The list is as wide as the field and its button, the most the sidebar has room for (it scrolls, so nothing can stick out of it). The descriptions are kept short enough to fit: a short form only where it teaches a sign.
+- **Presets** put a ready-made progression in the chosen key in place of the progression, with nothing pinned; the toast offers Undo (also `Z`). The **+** that shows on a preset under the mouse (or with the keyboard focus in it) adds it to the end instead. The tooltips say the key (C♯ minor for ii–V–i in D♭). On an empty progression the two do the same; the empty state's button loads ii–V–I.
+- **My presets** (`state.ui.saved`): **Save**, in the Progression heading, opens a name field above the list, filled with the progression's name (`state.ui.title`) or else its chords, and selected so typing replaces it. Enter keeps the progression under that name; `Esc` or leaving the field cancels. A name that's already there, in any case, replaces that one, with Undo. A click on a saved progression loads it as a preset does, its **+** adds it to the end, and Delete removes it, with Undo. A saved chord keeps its roman numeral and what was typed, but not its id, pin or being hidden.
+- The progression's name (`title`) is the preset's when one is loaded, or added to an empty progression; Clear, or typing chords into an empty progression, clears it. So Save offers the name of what's on screen, and saving a loaded preset of your own again, changed, replaces it.
+- A chord's row shows its color, name, roman numeral, what was typed when it's shown as the nearest chord ("from Cmaj9"), its notes and its pinned frets. Under the mouse it shows Hide / Show and Remove.
+- **Dragging a row moves the chord** (`initChordDrag`, pointer events rather than HTML drag and drop, which Tauri's own file drop handling stops on Windows). A press that moves less than 4 px stays a click. The row follows the pointer, raised, and a line in the accent color shows where it will go: before the first row whose middle is below the pointer. Releasing moves it there (`moveChordTo`); `Esc` puts it back. Colors stay with the places, not the chords, so the chord that becomes first turns blue. A double-click on the name puts a field in its place; Enter or leaving the field reads it, `Esc` cancels. A new chord loses the roman numeral and the pin.
+- **Remove**, **Clear**, loading a preset, and replacing or deleting a saved one show a toast with **Undo** (also `Z`) instead of asking first, as in Unified Mail.
 
 ## Keyboard
 
@@ -97,7 +107,6 @@ Shortcuts don't act while typing in a field or with Cmd, Ctrl or Alt held. With 
 A card over the window, closed by its ×, `Esc` or a click outside it.
 
 - **Appearance:** System, Light or Dark. `set_theme` sets the window's theme, which is also what the page's `prefers-color-scheme` reports, and saves it; the page sets `data-theme` at once as well, which is all a plain browser has. At launch Rust creates the window already in the saved theme (`"create": false` in the config).
-- **Frets:** 12, 15 (the default), 17, 20, 22 or 24.
 - **Left-handed:** the nut on the right.
 - **Open strings:** voicings that use open strings, near the nut, and with All notes the open strings' notes. On by default.
 - The version, from `app.getVersion`, and links as in Unified Mail: GitHub, Releases, Website, Privacy policy and Support (the website's pages, see [development.md](development.md#website)). They open in the browser through `open_external`.
