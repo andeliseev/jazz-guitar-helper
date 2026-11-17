@@ -37,11 +37,11 @@ The app isn't code-signed yet, so your system asks once before opening it:
 
 ## Using it
 
-**Chords.** Type chord symbols into **Add chords** and press Enter: `Dm7 G7 Cmaj7`, or a line from a chart, `| Gm7♭5 | C7♭9 | Fm6 |`. The usual ways of writing each chord work: `CΔ7`, `C-7`, `Cø`, `C°7`, `C7sus4`, `C7♯5`. Chords the app doesn't voice yet are shown as the nearest one it does, and say so: `Cmaj9` as Cmaj7, `G13` as G7, a plain `C` as C6. As you type, a list shows the chords that fit, with their names and, for chords like Dm9, what you'll see: choose one with ↓ and Enter or a click to add it, or press Tab to put it in and keep typing. In the sidebar, drag a chord up or down to move it in the progression, and point at it for its buttons: hide it from the fretboard, or remove it. Double-click its name to type another chord in its place.
+**Chords.** Type chord symbols into **Add chords** and press Enter: `Dm7 G7 Cmaj7`, or a line from a chart, `| Gm7♭5 | C7♭9 | Fm6 |`. The usual ways of writing each chord work: `CΔ7`, `C-7`, `Cø`, `C°7`, `C7sus4`, `C7♯5`. Chords with tensions keep every note: `G7♯5♭9` is G B D♯ F A♭ in the sidebar and over its fretboard, and on the neck in **Chord tones** and with **All notes**. Their drop voicings are those of the nearest four-note chord, which the chord says: `G7♯5♭9` voiced as G7♯5, `Cmaj9` as Cmaj7, `G13` as G7, a plain `C` as C6. As you type, a list shows the chords that fit, with their names and, for chords like Dm9, what they're voiced as: choose one with ↓ and Enter or a click to add it, or press Tab to put it in and keep typing. In the sidebar, drag a chord up or down to move it in the progression, and point at it for its buttons: hide it from the fretboard, or remove it. Double-click its name to type another chord in its place.
 
 **Presets.** Click a ready-made progression under **Presets** (ii–V–I, ii–V–i, I–vi–ii–V, iii–VI–ii–V) to put it in place of yours, in the key you choose; if that was a mistake, click **Undo**. Point at one and click its **+** to add it to the end instead. **Save**, next to Progression, keeps your progression under **My presets** with a name you give it; click it later to bring it back, or use its **+** to add it to the end. Saving under a name that's already there replaces that one.
 
-**Voicings.** Choose **Drop 2**, **Drop 3** or **Drop 2&4**, then the **strings** to play them on (Drop 2 on four strings next to each other, the others with one string skipped) and the **inversions**: Root has the root in the bass, 1st the 3rd, 2nd the 5th, 3rd the 7th. Double-click a string set or an inversion to show only that one.
+**Voicings.** Choose **Drop 2**, **Drop 3** or **Drop 2&4**, then the **strings** to play them on (Drop 2 on four strings next to each other, the others with one string skipped) and the **inversions**: Root has the root in the bass, 1st the 3rd, 2nd the 5th, 3rd the 7th. Double-click a string set or an inversion to show only that one. Or choose **Chord tones** for every note of each chord on the whole neck, without voicings: what only voicings use dims until you choose a drop type again, and the voicings you pinned come back with it.
 
 **Views.** **Stacked** shows a fretboard per chord, one under another and lined up, each with its fret numbers under it, so a column of frets shows what each chord has in that position; the fret under the mouse lights up on every fretboard. **Overlay** puts every chord on one fretboard in its own color; where chords share a note, their dots stand side by side. **Intervals** or **Notes** chooses what the dots say. **All notes** adds every other note of each chord on the neck, outlined, so you see the whole arpeggio around the voicings. **Frets** sets how many frets they show, 12 to 24. Drag **Height** to make the fretboards taller or shorter; Stacked and Overlay each keep their own height, and a double-click on it goes back to the usual one.
 
@@ -51,7 +51,7 @@ The app isn't code-signed yet, so your system asks once before opening it:
 
 | Key | Action |
 | --- | --- |
-| `1` / `2` / `3` | Drop 2 / Drop 3 / Drop 2&4 |
+| `1` / `2` / `3` / `4` | Drop 2 / Drop 3 / Drop 2&4 / Chord tones |
 | `V` | Stacked or Overlay |
 | `N` | Intervals or Notes on the dots |
 | `L` | Voice leading on or off |

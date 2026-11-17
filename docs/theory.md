@@ -76,9 +76,9 @@ From the open Dm7 on the top strings this gives Dm7 `x x 0 2 1 1` → G7 `x x 0 
 
 `parseChord` reads a root (A–G, upper or lower case, with `#`, `b`, `♯` or `♭`, at most two), then the rest as a suffix. `normalize` writes the many spellings one way: `Δ`, `^`, `M`, `Ma`, `j` mean maj; `-`, `min`, `mi` mean m; `ø` is m7♭5; `°` and `o` are dim; parentheses and spaces go; a slash bass (`C/E`) is dropped.
 
-A suffix that means one of the qualities exactly (`EXACT`) gives that quality. Anything else that's still a chord gives the nearest quality the app voices, with `approx: true`, and the sidebar shows what was typed ("from Cmaj9"):
+A suffix that means one of the qualities exactly (`EXACT`) gives that quality. Anything else that's still a chord gives the nearest quality the app voices, with `approx: true`; the chord keeps what was typed (`text`), which gives its name and all its notes (see [Every note of a chord](#every-note-of-a-chord)), and its voicings say "voiced as Cmaj7":
 
-| Written | Shown as |
+| Written | Voiced as |
 | --- | --- |
 | `C`, `Cadd9`, `C69` | C6 |
 | `Cm`, `Cm9`, `Cm11` | Cm7 |
@@ -97,9 +97,29 @@ A plain major triad becomes a 6 chord because that's how jazz players usually vo
 `suggestChords(token)` is what Add chords suggests while a symbol is typed. It reads the root as `parseChord` does, normalizes what follows it, and lists:
 
 1. Each quality with a way of writing it (`EXACT`) that starts with what's typed, in `QUALITIES` order: `Dm7`, described as "minor 7th · D–7". The short form (`SHORTHAND`) is added only where it teaches a sign: Δ, –, ø, o, sus, +.
-2. Once something follows the root, common chords the app shows as the nearest one (`NEARBY`: maj9, maj7♯11, 9, 13, 7♭9, 7♯9, 7♯11, 7♭13, 7alt, m9, m11, 69, 9sus4, add9), with `approx: true` and what they're shown as: `Dm9`, "shown as Dm7".
+2. Once something follows the root, common chords the app voices as the nearest one (`NEARBY`: maj9, maj7♯11, 9, 13, 7♭9, 7♯9, 7♯11, 7♭13, 7alt, 7♯5♭9, 7♯5♯9, 13♭9, 9♯11, m9, m11, 69, 9sus4, add9), with `approx: true` and what they're voiced as: `Dm9`, "voiced as Dm7".
 
 A lone `m` means minor, so it doesn't suggest maj chords. At most 12 (`limit`). Every suggestion reads back with `parseChord` as the quality and `approx` it was listed with; the tests check that.
+
+## Every note of a chord
+
+A chord is voiced as one of the twelve four-note qualities, but has all the notes its symbol asks for. `chordNotes(chord)` gives them, in the chord's order: root, 3rd (or a sus chord's 2nd or 4th), 5th, 6th or 7th, then the tensions low to high, each pitch once. For a chord voiced as written, or a ready-made one, they're its four tones (`chordTones`); for one voiced as the nearest, `suffixTones` reads them from what was typed:
+
+| Written | Notes in C | Intervals |
+| --- | --- | --- |
+| `C`, `Cm`, `C+`, `Csus` | C E G, C E♭ G, C E G♯, C F G | Triads stay triads, though they're voiced as C6, Cm7, C7♯5 and C7sus4 |
+| `Cmaj9`, `C69` | C E G B D, C E G A D | R 3 5 7 9, R 3 5 6 9 |
+| `C7♯5♭9` | C E G♯ B♭ D♭ | R 3 ♯5 ♭7 ♭9 |
+| `C13` | C E G B♭ D A | R 3 5 ♭7 9 13: a 13th has the 9th, and skips the 11th, which clashes with the 3rd |
+| `Cm13` | C E♭ G B♭ D F A | R ♭3 5 ♭7 9 11 13: on a minor chord the 11th stays |
+| `C11` | C G B♭ D F | R 5 ♭7 9 11: a dominant 11th without its 3rd, as jazz players read it (C9sus4) |
+| `C13♭9`, `C9♯11` | C E G B♭ D♭ A, C E G B♭ D F♯ | An altered tension takes the place of the one the number brings |
+| `C7alt` | C E B♭ D♭ D♯ F♯ A♭ | R 3 ♭7 ♭9 ♯9 ♯11 ♭13: the 5th gives way to ♯11 and ♭13, as in the altered scale |
+| `Dm7/G` | D F A C G | R ♭3 5 ♭7 4: a slash chord's bass, when it isn't one of the notes already |
+
+`b`, `-`, `#` and `+` before 5, 9, 11 or 13 alter it; `add`, `sus`, `sus2`, `no3` and `no5` do what they say, and a `+` at the end makes the 5th sharp (`C7+`). A suffix the app voices as the nearest but can't read in full (`Cm7?`) has the four tones it's voiced with. `notesOnNeck` finds all of them on the neck, which is what All notes and Chord tones draw.
+
+`chordSymbol(chord)` names a chord as written: what was typed, with `♭` and `♯` for `b`, `#`, `-` and `+` before a number, `–` for a leading `-`, and `Δ` for `^` (`Bb-9` is B♭–9). A chord voiced as written keeps its own name (`chordName`).
 
 ## Ready-made progressions
 

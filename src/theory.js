@@ -102,12 +102,53 @@ export function chordName(chord) {
   return rootName(chord.root) + QUALITIES[chord.quality].suffix;
 }
 
-/** The chord's four tones in its own order: pitch class, interval label and spelled name. */
+/** A tone of a chord on `root`: pitch class, interval label and spelled name. */
+function toneOf(root, deg, semis, index) {
+  const note = spell(root, deg, semis);
+  return { index, deg, semis, pc: note.pc, label: intervalLabel(deg, semis), name: noteName(note.letter, note.acc) };
+}
+
+/** The four tones the chord is voiced with, in its own order (root, 3rd, 5th, 7th or 6th). */
 export function chordTones(chord) {
-  return QUALITIES[chord.quality].tones.map(([deg, semis], index) => {
-    const note = spell(chord.root, deg, semis);
-    return { index, deg, semis, pc: note.pc, label: intervalLabel(deg, semis), name: noteName(note.letter, note.acc) };
-  });
+  return QUALITIES[chord.quality].tones.map(([deg, semis], index) => toneOf(chord.root, deg, semis, index));
+}
+
+/**
+ * Every note of the chord as written, in its order: the chord tones, then the tensions, and a slash
+ * chord's bass when it isn't one of them. For a chord voiced as the nearest one, read from what was
+ * typed (G7♯5♭9 is G B D♯ F A♭, though it's voiced as G7♯5); otherwise its four tones.
+ */
+export function chordNotes(chord) {
+  const written = chord.approx && chord.text ? readSymbol(chord.text) : null;
+  if (!written) return chordTones(chord);
+  const notes = written.tones.map(([deg, semis], index) => toneOf(chord.root, deg, semis, index));
+  const { bass } = written;
+  if (bass) {
+    const semis = mod(NATURAL[bass.letter] + bass.acc - NATURAL[chord.root.letter] - chord.root.acc, 12);
+    const deg = mod(bass.letter - chord.root.letter, 7) + 1;
+    if (!notes.some((n) => mod(n.semis, 12) === semis)) notes.push(toneOf(chord.root, deg, semis, notes.length));
+  }
+  return notes;
+}
+
+/** The chord as written: what was typed for one voiced as the nearest, with ♭ and ♯ (G7♯5♭9). */
+export function chordSymbol(chord) {
+  const m = chord.approx && chord.text ? SYMBOL.exec(chord.text.trim()) : null;
+  return m ? rootName(chord.root) + prettySuffix(m[3]) : chordName(chord);
+}
+
+/** A typed suffix with proper signs: ♭ and ♯ for b, #, - and + before a number, Δ for ^. */
+function prettySuffix(suffix) {
+  // A sign that starts the suffix is the chord's own: - is minor, + augmented.
+  const lead = /^[-+]/.exec(suffix)?.[0] || '';
+  const rest = suffix
+    .slice(lead.length)
+    .replace(/\/([A-Ga-g])([#b]?)$/, (_, letter, acc) => `/${letter.toUpperCase()}${acc.replace('b', '♭').replace('#', '♯')}`)
+    .replace(/[b-](?=\d)/g, '♭')
+    .replace(/\+(?=\d)/g, '♯')
+    .replace(/#/g, '♯')
+    .replace(/\^/g, 'Δ');
+  return (lead === '-' ? '–' : lead) + rest;
 }
 
 // Voicings
@@ -156,9 +197,9 @@ export function voicings(chord, drop, set, { frets = 15, openStrings = true } = 
   return found.sort((a, b) => a.low - b.low || a.high - b.high);
 }
 
-/** Every place on the neck within `frets` frets where one of the chord's tones is, on every string. */
+/** Every place on the neck within `frets` frets where one of the chord's notes is, on every string. */
 export function notesOnNeck(chord, { frets = 15, openStrings = true } = {}) {
-  const tones = new Map(chordTones(chord).map((t) => [t.pc, t]));
+  const tones = new Map(chordNotes(chord).map((t) => [t.pc, t]));
   const found = [];
   for (let string = 1; string <= 6; string++) {
     for (let fret = openStrings ? 0 : 1; fret <= frets; fret++) {
@@ -247,7 +288,10 @@ const EXACT = {
   augMaj7: ['maj7#5', 'maj7+5', 'maj7+', 'maj#5', '+maj7', 'augmaj7'],
 };
 
-/** One spelling for the many ways chord suffixes are written. `slash` says a bass was dropped. */
+/**
+ * One spelling for the many ways chord suffixes are written. A slash chord's bass (C/E) comes off,
+ * as `bass`: it isn't part of a four-note drop voicing.
+ */
 function normalize(suffix) {
   let s = suffix
     .replace(/♭/g, 'b')
@@ -257,14 +301,115 @@ function normalize(suffix) {
     .replace(/[°º˚]/g, 'dim')
     .replace(/[−–]/g, '-')
     .replace(/[\s()]/g, '');
-  // A slash chord's bass note (C/E) isn't part of a four-note drop voicing.
-  const slash = /\/[A-Ga-g][#b]?$/.test(s);
-  s = s.replace(/\/[A-Ga-g][#b]?$/, '');
+  const over = /\/([A-Ga-g])([#b]?)$/.exec(s);
+  const bass = over && { letter: LETTERS.indexOf(over[1].toUpperCase()), acc: accidentalValue(over[2]) };
+  const slash = !!over;
+  if (over) s = s.slice(0, over.index);
   s = s.replace(/^(min|mi|-)/, 'm');
   // M, Ma, MA and j mean major, also after a minor's m: CM7, CmM7, Cj7.
   s = s.replace(/^(m?)(Maj|MAJ|MA|Ma|M|j)/, (_, m) => `${m}maj`);
   s = s.toLowerCase().replace(/^ma(?!j)/, 'maj');
-  return { s, slash };
+  return { s, slash, bass };
+}
+
+// Tensions and added notes at their natural size, in semitones.
+const NATURAL_TENSION = { 2: 2, 4: 5, 9: 14, 11: 17, 13: 21 };
+
+/**
+ * Every tone a chord suffix asks for, as normalize() leaves it: [interval number, semitones] in the
+ * chord's order (root, 3rd or a sus chord's 2nd or 4th, 5th, 6th or 7th, then the tensions). "maj9"
+ * is R 3 5 7 9, "7#5b9" R 3 ♯5 ♭7 ♭9, "alt" R 3 ♭7 ♭9 ♯9 ♯11 ♭13. Null when it isn't a suffix the
+ * app reads in full; such a chord shows the four tones it's voiced with.
+ */
+function suffixTones(s) {
+  let rest = s;
+  const take = (re) => {
+    const m = re.exec(rest);
+    if (m) rest = rest.slice(m[0].length);
+    return m;
+  };
+  let minor = false;
+  let dim = false;
+  let fifths = [7];
+  if (take(/^(dim|o)/)) {
+    dim = true;
+    fifths = [6];
+  } else if (take(/^(aug|\+)5?/)) fifths = [8];
+  else if (take(/^m(?!aj)/)) minor = true;
+  let third = [3, minor || dim ? 3 : 4];
+  const majorSeventh = !!take(/^maj/);
+  // How far the chord goes: 6, 6/9, or a 7th up to its 9th, 11th or 13th.
+  const number = take(/^(6\/9|69|6|7|9|11|13)/)?.[1];
+  let sixth = false;
+  let seventh = null;
+  let upTo = 0;
+  const tensions = [];
+  if (number && number.startsWith('6')) {
+    sixth = true;
+    if (number !== '6') tensions.push([9, 14]);
+  } else if (number || majorSeventh || dim) {
+    // "maj" and "dim" alone are maj7 and °7, as EXACT has them.
+    seventh = majorSeventh ? 11 : dim ? 9 : 10;
+    upTo = Number(number || 7);
+  }
+  let alt = false;
+  while (rest) {
+    let m;
+    if (take(/^[,/]/)) continue; // between tensions: C7(♭9,♯11)
+    if ((m = take(/^(b|-|#|\+)(5|9|11|13)/))) {
+      const by = m[1] === 'b' || m[1] === '-' ? -1 : 1;
+      const deg = Number(m[2]);
+      if (deg === 5) fifths = [...fifths.filter((f) => f !== 7), 7 + by];
+      else tensions.push([deg, NATURAL_TENSION[deg] + by]);
+    } else if ((m = take(/^add(2|4|9|11|13)/) || take(/^(9|11|13)/) || take(/^(2)$/))) {
+      tensions.push([Number(m[1]), NATURAL_TENSION[m[1]]]);
+    } else if ((m = take(/^sus(2|4)?/))) {
+      third = m[1] === '2' ? [2, 2] : [4, 5];
+    } else if (take(/^alt/)) {
+      alt = true;
+    } else if ((m = take(/^(no|omit)(3|5)/))) {
+      if (m[2] === '3') third = null;
+      else fifths = [];
+    } else if (take(/^\+$/)) {
+      fifths = [8]; // C7+
+    } else {
+      return null;
+    }
+  }
+  // An altered dominant: its 5th gives way to ♯11 and ♭13, as in the altered scale.
+  if (alt) {
+    if (seventh == null) seventh = 10;
+    fifths = [];
+    tensions.push([9, 13], [9, 15], [11, 18], [13, 20]);
+  }
+  // A 9th, 11th or 13th chord has the tensions below its number, unless they're altered; a 13th
+  // skips the 11th, which clashes with the 3rd, except on a minor chord. A dominant 11th leaves out
+  // the 3rd instead, as jazz players read it: C11 is C9sus4.
+  const has = (deg) => tensions.some(([d]) => d === deg);
+  if (upTo >= 9 && !has(9)) tensions.push([9, 14]);
+  if ((upTo === 11 || (upTo === 13 && minor)) && !has(11)) tensions.push([11, 17]);
+  if (upTo === 13 && !has(13)) tensions.push([13, 21]);
+  if (upTo === 11 && !minor && !majorSeventh && third?.[0] === 3) third = null;
+
+  const tones = [[1, 0]];
+  if (third) tones.push(third);
+  for (const f of [...new Set(fifths)].sort((a, b) => a - b)) tones.push([5, f]);
+  if (sixth) tones.push([6, 9]);
+  if (seventh != null) tones.push([7, seventh]);
+  // Tensions low to high, each pitch once (♯11 and ♭5 are one note).
+  for (const t of tensions.sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
+    if (!tones.some(([, semis]) => mod(semis - t[1], 12) === 0)) tones.push(t);
+  }
+  return tones;
+}
+
+/** What a chord symbol asks for in full: { tones, bass }, or null (suffixTones). */
+function readSymbol(text) {
+  const m = SYMBOL.exec(text.trim());
+  if (!m) return null;
+  const { s, bass } = normalize(m[3]);
+  const tones = suffixTones(s);
+  return tones && { tones, bass };
 }
 
 /** The quality nearest to a suffix that isn't exactly one of QUALITIES, or null. */
@@ -306,12 +451,16 @@ function accidentalValue(text) {
   return /[#♯]/.test(text) ? text.length : -text.length;
 }
 
+// A chord symbol: its root's letter and accidentals, then the suffix.
+const SYMBOL = /^([A-Ga-g])(♯♯|♭♭|##|bb|♯|♭|#|b)?(.*)$/;
+
 /**
  * Reads one chord symbol ("Dm7", "B♭Δ", "F♯ø", "G7alt"). Returns { root, quality, text, approx },
- * with `approx` when the chord is shown as the nearest one the app voices, or null.
+ * with `approx` when the chord is voiced as the nearest one the app has (chordNotes() still reads
+ * all its notes from `text`), or null.
  */
 export function parseChord(text) {
-  const m = /^([A-Ga-g])(♯♯|♭♭|##|bb|♯|♭|#|b)?(.*)$/.exec(text.trim());
+  const m = SYMBOL.exec(text.trim());
   if (!m) return null;
   const { s, slash } = normalize(m[3]);
   let quality = Object.keys(EXACT).find((q) => EXACT[q].includes(s));
@@ -340,9 +489,12 @@ export function parseChords(text) {
 // The usual short way to write a chord, shown next to its suggestion: "minor 7th · D–7". Only
 // where it teaches a sign; D–Δ and DΔ♯5 only combine signs shown on other rows.
 const SHORTHAND = { maj7: 'Δ', m7: '–7', m7b5: 'ø', dim7: 'o7', sus4: 'sus', aug7: '+7' };
-// Chords people write that the app shows as the nearest one it voices, suggested once something
+// Chords people write that the app voices as the nearest one it has, suggested once something
 // follows the root.
-const NEARBY = ['maj9', 'maj7#11', '9', '13', '7b9', '7#9', '7#11', '7b13', '7alt', 'm9', 'm11', '69', '9sus4', 'add9'];
+const NEARBY = [
+  'maj9', 'maj7#11', '9', '13', '7b9', '7#9', '7#11', '7b13', '7alt', '7#5b9', '7#5#9', '13b9', '9#11',
+  'm9', 'm11', '69', '9sus4', 'add9',
+];
 const pretty = (suffix) => suffix.replace(/b/g, '♭').replace(/#/g, '♯');
 
 /**
@@ -352,7 +504,7 @@ const pretty = (suffix) => suffix.replace(/b/g, '♭').replace(/#/g, '♯');
  * so it doesn't suggest maj chords.
  */
 export function suggestChords(token, limit = 12) {
-  const m = /^([A-Ga-g])(♯♯|♭♭|##|bb|♯|♭|#|b)?(.*)$/.exec(token.trim());
+  const m = SYMBOL.exec(token.trim());
   if (!m) return [];
   const name = rootName({ letter: LETTERS.indexOf(m[1].toUpperCase()), acc: accidentalValue(m[2]) });
   const { s } = normalize(m[3]);
@@ -368,7 +520,7 @@ export function suggestChords(token, limit = 12) {
       const form = normalize(suffix).s;
       if (!fits(form)) continue;
       const quality = nearest(form);
-      found.push({ text: name + pretty(suffix), quality, desc: `shown as ${name}${QUALITIES[quality].suffix}`, approx: true });
+      found.push({ text: name + pretty(suffix), quality, desc: `voiced as ${name}${QUALITIES[quality].suffix}`, approx: true });
     }
   }
   return found.slice(0, limit);

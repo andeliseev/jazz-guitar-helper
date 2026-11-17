@@ -13,7 +13,8 @@
 - A chord can only be changed by typing its symbol again (double-click). A menu of qualities and roots would be quicker.
 - My presets can't be renamed or reordered (save under a new name, then delete the old one), and stay in the key they were saved in: there's no transposing them, or the progression, to another key.
 - Suggestions follow what's typed, not the caret: moving it with ← and → doesn't change the list until the next key typed.
-- Chords that aren't one of the twelve qualities are shown as the nearest one (Cmaj9 as Cmaj7). The extensions themselves aren't voiced.
+- Chords that aren't one of the twelve qualities are voiced as the nearest one (Cmaj9 as Cmaj7). Chord tones and All notes show their tensions, but the voicings don't have them.
+- Chord tones: no way yet to show only some of the tones (the 3rds and 7ths, say, the guide tones), or to point at a note and see what it is.
 - Dots aren't reachable from the keyboard; pinning needs a mouse.
 - The window's size and position aren't remembered between launches.
 
@@ -24,6 +25,9 @@
 - **More voicing types:** close position on the top strings, Drop 2&3, shell voicings (R 3 7, R 7 3), triads and their inversions on each string set, spread triads.
 - **Drop types together:** the way many teachers present them, Drop 2 with the bass on the 4th and 5th strings and Drop 3 with it on the 6th, on one fretboard. Today a view shows one drop type at a time.
 - **Hear it:** play a voicing or the pinned path with Web Audio (a plucked-string sound), no samples needed.
+- **Scales over chords:** what to play over each chord: the usual scales and modes for its quality and function, with a sensible first choice (Dorian over a ii, Mixolydian over a V, altered over V7♯5♭9, Locrian over iiø, Ionian or Lydian over a maj7), its notes on the neck around the chord tones, on the whole neck or in one position (a window of 4–5 frets). Or one scale for the whole progression, its key.
+- **Staff:** the chord, or the pinned voicing, in notation: a bar per chord on a treble staff, an octave up as guitar music is written, drawn by the app in SVG (noteheads, accidentals, ledger lines) rather than with a notation library. With voice leading on, the staff shows the voices moving.
+- **Play along:** a metronome at a chosen tempo that walks through the progression, the chord being played highlighted on the fretboard (and scrolled to in Stacked). It needs each chord's length, which the progression doesn't keep yet; importing a chart would bring it. Goes with Hear it.
 - **Export:** the pinned path as chord diagrams (SVG or PNG) or as tab, to print or paste.
 - **Other tunings:** 7-string, DADGAD, drop D, baritone; the theory takes the tuning as a parameter already except for `TUNING`.
 - Import a chart (iReal Pro link or a text file), and share My presets as a file.

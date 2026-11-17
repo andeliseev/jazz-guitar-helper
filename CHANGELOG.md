@@ -4,6 +4,9 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+- Chord tones, next to Drop 2, Drop 3 and Drop 2&4 (or press 4): every note of each chord on the whole neck, without voicings. Your pinned voicings come back when you choose a drop type again.
+- Chords with tensions keep every note: G7♯5♭9 is G B D♯ F A♭ in the sidebar, over its fretboard, in Chord tones and with All notes. It keeps the name you typed, and says what its drop voicings are: "voiced as G7♯5".
+
 ## 0.1.1 (2026-11-17)
 
 - Suggestions as you type a chord: the chords that fit, with their names and usual short forms, and what you'll see for chords like Dm9 or G13. Choose one with the arrow keys and Enter or a click, or press Tab to keep typing.

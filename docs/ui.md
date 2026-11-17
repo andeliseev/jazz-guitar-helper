@@ -15,7 +15,7 @@ Plain HTML/CSS/JS in `src/`, with no framework and no build step. `withGlobalTau
 `#app` is a two-column grid: a 264 px sidebar and the main pane. Its single row is `minmax(0, 1fr)` so the fretboards scroll inside the window.
 
 - **Sidebar:** the brand, **Progression** (Save and Clear in its heading, a row per chord, then **Add chords** with its suggestions), **Presets** (a key and the ready-made progressions), **My presets** (the progressions saved), and Settings at the bottom. It scrolls when the progression is long.
-- **Toolbar:** two rows. The first chooses what's voiced: the drop type (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Frets (a select: 12, 15, the default, 17, 20, 22 or 24) and Height (a slider). When the pane is wide enough, the second row sits beside the first.
+- **Toolbar:** two rows. The first chooses what the boards show: a drop type or Chord tones (segmented), the string sets and the inversions (chips that are on or off). The second chooses how it's shown: Intervals or Notes, Stacked or Overlay, Voice leading, All notes, Frets (a select: 12, 15, the default, 17, 20, 22 or 24) and Height (a slider). When the pane is wide enough, the second row sits beside the first.
 - **Fretboards** (`#boards`): fret numbers on top, sticky while the boards scroll, then a board per chord (Stacked) or one board for all (Overlay). With no chord to show, an empty state says why, with a button that adds a ii–V–I.
 
 The window's minimum size is 960 × 560 (`tauri.conf.json`). Boards always fill the pane's width, and a new width redraws them (`ResizeObserver`). How tall they are is the user's choice (see [Height](#height)).
@@ -47,7 +47,7 @@ A board is drawn in this order: the wood (light maple, dark rosewood in dark mod
 
 - **Shapes:** a line through each voicing's four notes, in the chord's color, at 38% opacity, and over it a 14 px invisible line to point at (`.hit`).
 - **Dots:** one per chord per spot, in the chord's color, labeled with the tone's interval or note name. The root is a rounded square so it stands out without color. Where several chords have a note on the same spot (Overlay), their dots stand side by side in chord order, smaller if the fret is narrow; below a 6.5 px radius a dot has no label. A dot's radius is 0.46 of the gap between strings, at most 14 px, and its label grows with it (`LABEL_FIT`).
-- **All notes** (`state.ui.allNotes`): every other place the chord's tones are on the neck, on all six strings (`notesOnNeck` in `theory.js`), as outlined dots in the chord's color (`.ghost`). A note that's in a drawn voicing is drawn as the voicing's. Outlined dots belong to no voicing, so they have no `data-v`: the mouse passes them by, and they fade with the rest while a voicing is under the mouse.
+- **All notes** (`state.ui.allNotes`): every other place the chord's notes are on the neck, on all six strings (`notesOnNeck` in `theory.js`), tensions too (the ♭9 of G7♯5♭9, which its voicings, those of G7♯5, don't have), as outlined dots in the chord's color (`.ghost`). A note that's in a drawn voicing is drawn as the voicing's. Outlined dots belong to no voicing, so they have no `data-v`: the mouse passes them by, and they fade with the rest while a voicing is under the mouse.
 
 Each shape and voicing dot carries `data-v`, the voicings it belongs to (`<chord id>~<voicing id>`), which is all the mouse handling needs.
 
@@ -55,8 +55,14 @@ The fret numbers sit above the boards in their own SVG, the inlay frets darker. 
 
 ## Views
 
-- **Stacked:** a board per chord, headed by the chord's name, notes and roman numeral. On the right of the heading, the voicing under the mouse or the pinned one: inversion and frets. A click on a chord in the sidebar scrolls its board into view.
+- **Stacked:** a board per chord, headed by the chord as written (`chordSymbol`), all its notes (`chordNotes`), its roman numeral and, for a chord voiced as another, "voiced as G7♯5". On the right of the heading, the voicing under the mouse or the pinned one: inversion and frets. A click on a chord in the sidebar scrolls its board into view.
 - **Overlay:** one board for all the chords. A legend above names each chord with its pinned frets; the line below shows the voicing under the mouse, or the pinned path (`Dm7 x x 3 5 3 5 → G7 x x 3 4 3 3 → …`).
+
+### Chord tones
+
+The fourth choice next to the drop types (`state.ui.mode`, `voicings` or `tones`; key `4`) shows every note of each chord on the whole neck instead of voicings: the places All notes would outline, as dots of their own (`notes` in a board's layer), with no lines and no `data-v`, so the mouse passes them by. Stacked and Overlay, Intervals or Notes, Frets and Height work as with voicings; in Overlay, notes the chords share stand side by side, which shows what can stay put from one chord to the next.
+
+What only voicings use (Strings, Inversions, Voice leading, All notes) stays where it is, dimmed and disabled, so the toolbar doesn't move; the mouse goes through a dimmed string set or inversion to its group, whose tooltip says to choose a drop type. `ui.drop` keeps the drop type, and choosing it again (or `1`, `2`, `3`) brings the voicings back. The pins stay too: `computeRows` doesn't start a path while there are no voicings, and `Esc` doesn't unpin.
 
 ### Height
 
@@ -71,20 +77,20 @@ The Height slider sets the gap between strings, 16 to 44 px, which is how tall t
   - Turning it on shows a path at once (`toggleLeading`): from the voicing pinned last, or with none, from the first chord's lowest voicing (`startPath`, which marks the anchor `autoAnchor`).
   - When the anchor's voicing isn't drawn any more (another drop type or string set, its chord hidden, changed or removed), the path starts again from the first chord, so voice leading always shows one. After the user unpins everything, it waits for a click.
   - Turning it off keeps only the anchor's pin, and only when the user pinned it; the pins the path chose, and an anchor the app chose, go.
-- Pins are voicing ids, which include the drop type and strings, so a pin only shows while its voicing is drawn, and comes back when it is again.
-- `Esc` unpins everything.
+- Pins are voicing ids, which include the drop type and strings, so a pin only shows while its voicing is drawn, and comes back when it is again (after Chord tones, say).
+- `Esc` unpins everything, except in Chord tones, where the pins don't show.
 
 ## The progression
 
 - **Add chords** reads the field with `parseChords`; what doesn't read stays in the field and a toast says what it was.
-- **Suggestions** (`renderSuggestions`, from `suggestChords` in [theory.md](theory.md#suggestions)): while typing, a list under the field shows the chords that fit the symbol the caret is in, up to 12. The ones the app voices come first, bold, named in full; the ones it shows as the nearest (`Dm9`) are in regular weight and say what they're shown as. One suggestion that is just what's typed isn't shown.
+- **Suggestions** (`renderSuggestions`, from `suggestChords` in [theory.md](theory.md#suggestions)): while typing, a list under the field shows the chords that fit the symbol the caret is in, up to 12. The ones the app voices as written come first, bold, named in full; the ones it voices as the nearest (`Dm9`) are in regular weight and say what they're voiced as. One suggestion that is just what's typed isn't shown.
   - ↓ and ↑ choose one; none is chosen at first, so Enter still adds what's typed. Enter or a click puts the chosen one in place of the symbol and adds the field. Tab puts it in (the first one when none is chosen) with a space after, to type the next chord. `Esc` closes the list, and a second `Esc` leaves the field. A press on the list doesn't take the focus from the field.
   - The field is a combobox: `aria-expanded`, `aria-controls` the list (`role="listbox"`), and `aria-activedescendant` the chosen row.
   - The list is as wide as the field and its button, the most the sidebar has room for (it scrolls, so nothing can stick out of it). The descriptions are kept short enough to fit: a short form only where it teaches a sign.
 - **Presets** put a ready-made progression in the chosen key in place of the progression, with nothing pinned; the toast offers Undo (also `Z`). The **+** that shows on a preset under the mouse (or with the keyboard focus in it) adds it to the end instead. The tooltips say the key (C♯ minor for ii–V–i in D♭). On an empty progression the two do the same; the empty state's button loads ii–V–I.
 - **My presets** (`state.ui.saved`): **Save**, in the Progression heading, opens a name field above the list, filled with the progression's name (`state.ui.title`) or else its chords, and selected so typing replaces it. Enter keeps the progression under that name; `Esc` or leaving the field cancels. A name that's already there, in any case, replaces that one, with Undo. A click on a saved progression loads it as a preset does, its **+** adds it to the end, and Delete removes it, with Undo. A saved chord keeps its roman numeral and what was typed, but not its id, pin or being hidden.
 - The progression's name (`title`) is the preset's when one is loaded, or added to an empty progression; Clear, or typing chords into an empty progression, clears it. So Save offers the name of what's on screen, and saving a loaded preset of your own again, changed, replaces it.
-- A chord's row shows its color, name, roman numeral, what was typed when it's shown as the nearest chord ("from Cmaj9"), its notes and its pinned frets. Under the mouse it shows Hide / Show and Remove.
+- A chord's row shows its color, its name as written (Cmaj9, though it's voiced as Cmaj7), its roman numeral, "voiced as Cmaj7" when its voicings are another chord's (`voicedAs`, not in Chord tones), all its notes and its pinned frets. Under the mouse it shows Hide / Show and Remove. Toasts, the legend, the path and My presets name chords as written too.
 - **Dragging a row moves the chord** (`initChordDrag`, pointer events rather than HTML drag and drop, which Tauri's own file drop handling stops on Windows). A press that moves less than 4 px stays a click. The row follows the pointer, raised, and a line in the accent color shows where it will go: before the first row whose middle is below the pointer. Releasing moves it there (`moveChordTo`); `Esc` puts it back. Colors stay with the places, not the chords, so the chord that becomes first turns blue. A double-click on the name puts a field in its place; Enter or leaving the field reads it, `Esc` cancels. A new chord loses the roman numeral and the pin.
 - **Remove**, **Clear**, loading a preset, and replacing or deleting a saved one show a toast with **Undo** (also `Z`) instead of asking first, as in Unified Mail.
 
@@ -92,7 +98,7 @@ The Height slider sets the gap between strings, 16 to 44 px, which is how tall t
 
 | Key | Action |
 | --- | --- |
-| `1` / `2` / `3` | Drop 2 / Drop 3 / Drop 2&4 |
+| `1` / `2` / `3` / `4` | Drop 2 / Drop 3 / Drop 2&4 / Chord tones |
 | `V` | Stacked or Overlay |
 | `N` | Intervals or Notes |
 | `L` | Voice leading |

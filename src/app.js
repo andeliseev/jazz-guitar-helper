@@ -7,6 +7,8 @@ import {
   PRESETS,
   STRING_NAMES,
   chordName,
+  chordNotes,
+  chordSymbol,
   chordTones,
   fretText,
   inversionName,
@@ -117,6 +119,8 @@ function defaultUi() {
     saved: [],
     nextPresetId: 1,
     key: 'C',
+    // What the boards show: `voicings` of the drop type, or every note of each chord (`tones`).
+    mode: 'voicings',
     drop: 'drop2',
     sets: { drop2: ['4321'], drop3: ['6432'], drop24: ['6532'] },
     inversions: [0, 1, 2, 3],
@@ -160,6 +164,7 @@ function sanitize(saved) {
   }
   ui.nextPresetId = Math.max(Number.isInteger(saved.nextPresetId) ? saved.nextPresetId : 1, ...ui.saved.map((p) => p.id + 1), 1);
   if (KEYS.includes(saved.key)) ui.key = saved.key;
+  if (saved.mode === 'tones') ui.mode = 'tones';
   if (DROPS[saved.drop]) ui.drop = saved.drop;
   for (const drop of Object.keys(DROPS)) {
     const sets = saved.sets?.[drop];
@@ -214,7 +219,8 @@ function chordTonesOk(chord) {
 const state = {
   ui: defaultUi(),
   theme: 'system',
-  // The chords on the fretboard (not hidden): { chord, cls, tones, voicings }.
+  // The chords on the fretboard (not hidden): { chord, cls, notes, voicings }, `notes` being all of
+  // the chord's (chordNotes) and `voicings` none in Chord tones.
   rows: [],
   // The boards' geometry, the boards' width it was made for, and the fret under the mouse.
   geo: null,
@@ -245,14 +251,16 @@ function chordVoicings(chord) {
 
 function computeRows() {
   const { ui } = state;
+  const tones = ui.mode === 'tones';
   state.rows = [];
   ui.chords.forEach((chord, index) => {
     if (chord.hidden) return;
-    state.rows.push({ chord, cls: `c${index % COLORS}`, tones: chordTones(chord), voicings: chordVoicings(chord) });
+    state.rows.push({ chord, cls: `c${index % COLORS}`, notes: chordNotes(chord), voicings: tones ? [] : chordVoicings(chord) });
   });
   // A path whose start isn't drawn any more (another drop type, other strings, its chord hidden or
-  // removed) starts again from the first chord. With nothing pinned there's no path to keep.
-  if (ui.leading && !relead() && Object.keys(ui.pins).length) startPath();
+  // removed) starts again from the first chord. With nothing pinned there's no path to keep. Chord
+  // tones draws no voicings, so the pins wait there for the voicings to come back.
+  if (!tones && ui.leading && !relead() && Object.keys(ui.pins).length) startPath();
 }
 
 /**
@@ -323,7 +331,7 @@ function renderSaved() {
       const item = el('div', 'saved-item');
       item.dataset.id = preset.id;
       item.title = `Put “${preset.name}” in place of the progression`;
-      item.append(el('div', 'saved-name', preset.name), el('div', 'saved-chords', preset.chords.map(chordName).join(' ')));
+      item.append(el('div', 'saved-name', preset.name), el('div', 'saved-chords', preset.chords.map(chordSymbol).join(' ')));
       const actions = el('div', 'item-actions');
       actions.append(actionButton('append', ICONS.plus, 'Add to the end'), actionButton('delete', ICONS.remove, 'Delete', 'danger'));
       item.append(actions);
@@ -346,13 +354,13 @@ function chordItem(chord, index) {
   const item = el('div', `chord-item c${index % COLORS}${chord.hidden ? ' off' : ''}`);
   item.dataset.id = chord.id;
   const head = el('div', 'item-head');
-  const name = el('span', 'name', chordName(chord));
+  const name = el('span', 'name', chordSymbol(chord));
   name.title = 'Double-click to change';
   head.append(el('span', 'dot'), name);
   if (chord.role) head.append(el('span', 'role', chord.role));
-  // Shown as the nearest chord the app voices: "from Cmaj9".
-  if (chord.approx && chord.text) head.append(el('span', 'from', `from ${chord.text}`));
-  item.append(head, el('div', 'notes', chordTones(chord).map((t) => t.name).join(' ')));
+  const voiced = voicedAs(chord);
+  if (voiced) head.append(el('span', 'voiced', voiced));
+  item.append(head, el('div', 'notes', chordNotes(chord).map((t) => t.name).join(' ')));
   const pinned = pinnedVoicing(chord);
   if (pinned) {
     const frets = el('div', 'frets', fretText(pinned));
@@ -362,6 +370,15 @@ function chordItem(chord, index) {
   item.title = 'Drag to move it in the progression';
   item.append(itemActions(chord));
   return item;
+}
+
+/**
+ * "voiced as Cmaj7" for a chord whose voicings are the nearest chord's (Cmaj9), while voicings show;
+ * '' otherwise.
+ */
+function voicedAs(chord) {
+  const name = chordName(chord);
+  return state.ui.mode === 'voicings' && chordSymbol(chord) !== name ? `voiced as ${name}` : '';
 }
 
 function itemActions(chord) {
@@ -445,7 +462,8 @@ function initChordDrag() {
 
 function renderToolbar() {
   const { ui } = state;
-  for (const b of $$('#drop button')) b.setAttribute('aria-checked', String(b.dataset.drop === ui.drop));
+  const tones = ui.mode === 'tones';
+  for (const b of $$('#drop button')) b.setAttribute('aria-checked', String(b.dataset.drop ? !tones && b.dataset.drop === ui.drop : tones));
   const chosen = ui.sets[ui.drop];
   $('#sets').replaceChildren(
     ...DROPS[ui.drop].sets.map((set) => {
@@ -454,14 +472,26 @@ function renderToolbar() {
       b.dataset.set = set;
       b.setAttribute('aria-pressed', String(chosen.includes(set)));
       b.title = `Strings ${strings.slice(0, 3).join(', ')} and ${strings[3]} (${strings.map((s) => STRING_NAMES[s]).join(' ')}). Double-click to show only these.`;
+      b.disabled = tones;
       return b;
     }),
   );
-  for (const b of $$('#inversions button')) b.setAttribute('aria-pressed', String(ui.inversions.includes(Number(b.dataset.inversion))));
+  for (const b of $$('#inversions button')) {
+    b.setAttribute('aria-pressed', String(ui.inversions.includes(Number(b.dataset.inversion))));
+    b.disabled = tones;
+  }
+  // Chord tones draws no voicings: what only voicings use stays where it is, dimmed, so the
+  // toolbar doesn't move. A dimmed button lets the mouse through, to its group's tooltip.
+  for (const group of [$('#sets'), $('#inversions')].map((n) => n.closest('.group'))) {
+    group.classList.toggle('off', tones);
+    group.title = tones ? 'For drop voicings: choose Drop 2, Drop 3 or Drop 2&4' : '';
+  }
   for (const b of $$('#labels button')) b.setAttribute('aria-checked', String(b.dataset.labels === ui.labels));
   for (const b of $$('#view button')) b.setAttribute('aria-checked', String(b.dataset.view === ui.view));
   $('#leading').setAttribute('aria-pressed', String(ui.leading));
   $('#all-notes').setAttribute('aria-pressed', String(ui.allNotes));
+  $('#leading').disabled = tones;
+  $('#all-notes').disabled = tones;
   $('#height').value = ui.heights[ui.view];
   $('#frets').value = String(ui.frets);
 }
@@ -478,7 +508,9 @@ function renderBoards() {
     state.geo = null;
     $('#empty-text').textContent = ui.chords.length
       ? 'Every chord is hidden. Show one with its eye button in the sidebar.'
-      : 'Add chords to see all their drop voicings on the neck.';
+      : ui.mode === 'tones'
+        ? 'Add chords to see all their notes on the neck.'
+        : 'Add chords to see all their drop voicings on the neck.';
     $('#empty-add').hidden = ui.chords.length > 0;
     $('#empty-add').textContent = `Add ii–V–I in ${ui.key}`;
     return;
@@ -515,16 +547,24 @@ function ruler(geo) {
 
 /**
  * What a board draws for a chord: its voicings, each note labeled as chosen, and with All notes on,
- * every other place its tones are on the neck (`extras`).
+ * every other place its notes are on the neck, outlined (`extras`). Chord tones draws those places
+ * as dots of their own (`notes`), and no voicings.
  */
 function layerOf(row) {
   const { ui } = state;
   const note = (n) => ({ string: n.string, fret: n.fret, label: ui.labels === 'notes' ? n.tone.name : n.tone.label, root: n.tone.deg === 1 });
+  const neck = () => notesOnNeck(row.chord, { frets: ui.frets, openStrings: ui.openStrings }).map(note);
+  if (ui.mode === 'tones') return { cls: row.cls, voicings: [], notes: neck() };
   return {
     cls: row.cls,
     voicings: row.voicings.map((v) => ({ id: v.key, notes: v.notes.map(note) })),
-    extras: ui.allNotes ? notesOnNeck(row.chord, { frets: ui.frets, openStrings: ui.openStrings }).map(note) : [],
+    extras: ui.allNotes ? neck() : [],
   };
+}
+
+/** What a board shows, for its label: "Dm7: Drop 2 voicings", "All chords: chord tones". */
+function showing(what) {
+  return `${what}: ${state.ui.mode === 'tones' ? 'chord tones' : `${DROPS[state.ui.drop].name} voicings`}`;
 }
 
 function board(geo, layers, label) {
@@ -540,13 +580,16 @@ function stackedRow(row, geo) {
   const section = el('section', `row ${row.cls}`);
   section.dataset.chord = row.chord.id;
   const head = el('header', 'row-head');
-  head.append(el('span', 'dot'), el('span', 'row-name', chordName(row.chord)), el('span', 'row-notes', row.tones.map((t) => t.name).join(' ')));
+  const name = chordSymbol(row.chord);
+  head.append(el('span', 'dot'), el('span', 'row-name', name), el('span', 'row-notes', row.notes.map((t) => t.name).join(' ')));
   if (row.chord.role) head.append(el('span', 'row-role', row.chord.role));
+  const voiced = voicedAs(row.chord);
+  if (voiced) head.append(el('span', 'row-voiced', voiced));
   const info = el('span', 'row-info');
   info.dataset.chord = row.chord.id;
   head.append(info);
-  section.append(head, board(geo, [layerOf(row)], `${chordName(row.chord)}: ${DROPS[state.ui.drop].name} voicings`));
-  if (!row.voicings.length) section.append(el('p', 'row-none', 'No voicings with these strings and inversions.'));
+  section.append(head, board(geo, [layerOf(row)], showing(name)));
+  if (state.ui.mode === 'voicings' && !row.voicings.length) section.append(el('p', 'row-none', 'No voicings with these strings and inversions.'));
   return section;
 }
 
@@ -556,12 +599,12 @@ function overlayView(geo) {
   for (const row of state.rows) {
     const item = el('span', `legend-item ${row.cls}`);
     item.dataset.chord = row.chord.id;
-    item.append(el('span', 'dot'), el('b', null, chordName(row.chord)));
+    item.append(el('span', 'dot'), el('b', null, chordSymbol(row.chord)));
     if (row.chord.role) item.append(el('span', 'row-role', row.chord.role));
     item.append(el('span', 'frets'));
     legend.append(item);
   }
-  section.append(legend, board(geo, state.rows.map(layerOf), `All chords: ${DROPS[state.ui.drop].name} voicings`), el('div', 'overlay-info'));
+  section.append(legend, board(geo, state.rows.map(layerOf), showing('All chords')), el('div', 'overlay-info'));
   return section;
 }
 
@@ -616,9 +659,11 @@ function renderInfo(drawn, pinned) {
         const v = pinned.has(`${row.chord.id}~${ui.pins[row.chord.id]}`) && pinnedOf(row.chord.id);
         if (!v) continue;
         if (path.length) path.push('  →  ');
-        path.push(`${chordName(row.chord)} `, el('b', null, fretText(v)));
+        path.push(`${chordSymbol(row.chord)} `, el('b', null, fretText(v)));
       }
       info.replaceChildren(...path);
+    } else if (ui.mode === 'tones') {
+      info.textContent = 'Every note of each chord. Where chords share a note, their dots stand side by side: notes you can keep from one chord to the next.';
     } else {
       info.textContent = ui.leading
         ? 'Point at a voicing to see its frets. Click one to pin it, and the other chords follow with their closest voicings.'
@@ -637,7 +682,7 @@ function renderInfo(drawn, pinned) {
 /** "Dm7 · 1st inversion, ♭3 in the bass · x x 3 5 3 5", the frets in bold. */
 function describe(v, withChord, more) {
   const parts = [];
-  if (withChord) parts.push(`${chordName(state.ui.chords.find((c) => c.id === chordOfKey(v.key)))} · `);
+  if (withChord) parts.push(`${chordSymbol(state.ui.chords.find((c) => c.id === chordOfKey(v.key)))} · `);
   parts.push(`${inversionName(v)} · `, el('b', null, fretText(v)));
   if (more > 0) parts.push(` · and ${more} more using this note`);
   return parts;
@@ -744,7 +789,7 @@ function startSaving() {
   const { ui } = state;
   if (!ui.chords.length) return;
   const field = $('#save-name');
-  const chords = ui.chords.map(chordName).join(' ');
+  const chords = ui.chords.map(chordSymbol).join(' ');
   field.value = ui.title || (chords.length > 40 ? `${chords.slice(0, 39)}…` : chords);
   $('#save-form').hidden = false;
   field.focus();
@@ -902,7 +947,7 @@ function removeChord(index) {
   const pin = ui.pins[chord.id];
   delete ui.pins[chord.id];
   render();
-  toast(`Removed ${chordName(chord)}`, 'Undo', () => {
+  toast(`Removed ${chordSymbol(chord)}`, 'Undo', () => {
     ui.chords.splice(Math.min(index, ui.chords.length), 0, chord);
     if (pin) ui.pins[chord.id] = pin;
     render();
@@ -936,7 +981,8 @@ function editChord(id) {
   const name = $(`.chord-item[data-id="${id}"] .name`);
   if (!chord || !name) return;
   const input = el('input', 'name-edit');
-  input.value = chord.approx && chord.text ? chord.text : chordName(chord);
+  input.value = chordSymbol(chord);
+  const before = input.value;
   input.spellcheck = false;
   input.setAttribute('aria-label', 'Chord symbol');
   name.replaceWith(input);
@@ -947,7 +993,7 @@ function editChord(id) {
     if (done) return;
     done = true;
     const text = input.value.trim();
-    if (keep && text && text !== chordName(chord)) {
+    if (keep && text && text !== before) {
       const parsed = parseChord(text);
       if (parsed) {
         const same = parsed.root.letter === chord.root.letter && parsed.root.acc === chord.root.acc && parsed.quality === chord.quality;
@@ -979,6 +1025,13 @@ function toggleIn(list, value) {
 
 function setDrop(drop) {
   state.ui.drop = drop;
+  state.ui.mode = 'voicings';
+  render();
+}
+
+/** Chord tones: every note of each chord on the neck, and no voicings (pins wait for them). */
+function showTones() {
+  state.ui.mode = 'tones';
   render();
 }
 
@@ -998,6 +1051,7 @@ function toggleLabels() {
  */
 function toggleLeading() {
   const { ui } = state;
+  if (ui.mode === 'tones') return; // no voicings to lead
   ui.leading = !ui.leading;
   if (ui.leading) {
     if (!relead()) startPath();
@@ -1173,12 +1227,14 @@ function onKey(e) {
   if (e.key === 'Escape') {
     if (!$('#settings').hidden) closeSettings();
     else if (isTyping(e)) e.target.blur();
-    else if (Object.keys(state.ui.pins).length) clearPins();
+    // Pins only show with voicings; Chord tones keeps them for when they're back.
+    else if (state.ui.mode === 'voicings' && Object.keys(state.ui.pins).length) clearPins();
     return;
   }
   if (!$('#settings').hidden || e.metaKey || e.ctrlKey || e.altKey || isTyping(e)) return;
   const key = shortcutKey(e);
   if (['1', '2', '3'].includes(key)) setDrop(Object.keys(DROPS)[Number(key) - 1]);
+  else if (key === '4') showTones();
   else if (key === 'v') toggleView();
   else if (key === 'n') toggleLabels();
   else if (key === 'l') toggleLeading();
@@ -1256,8 +1312,9 @@ function bindEvents() {
 
   // Toolbar. A double-click on a string set or inversion shows only that one.
   $('#drop').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-drop]');
-    if (b) setDrop(b.dataset.drop);
+    const b = e.target.closest('button');
+    if (b?.dataset.drop) setDrop(b.dataset.drop);
+    else if (b) showTones();
   });
   $('#sets').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-set]');

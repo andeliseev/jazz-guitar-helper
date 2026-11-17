@@ -103,9 +103,10 @@ export function boardMarkup(geo) {
 
 /**
  * Chords' notes as dots, and a line through each voicing's notes. `layers` has one entry per chord:
- * { cls, voicings: [{ id, notes: [{ string, fret, label, root }] }], extras: [notes] }, `cls` being
- * its color class and `extras` other notes of the chord to show, outlined (All notes). Where several
- * chords share a spot, their dots stand side by side in chord order.
+ * { cls, voicings: [{ id, notes: [{ string, fret, label, root }] }], notes, extras }, `cls` being its
+ * color class, `notes` notes of the chord in no voicing (Chord tones) and `extras` other notes of
+ * the chord to show, outlined (All notes). Where several chords share a spot, their dots stand side
+ * by side in chord order.
  */
 export function notesMarkup(geo, layers, { radius }) {
   // Each spot's chords, and which of their voicings use it.
@@ -123,6 +124,10 @@ export function notesMarkup(geo, layers, { radius }) {
         if (!entry) spot.entries.set(li, (entry = { layer: li, label: n.label, root: n.root, ids: [] }));
         entry.ids.push(v.id);
       }
+    }
+    for (const n of layer.notes || []) {
+      const spot = spotAt(n);
+      if (!spot.entries.has(li)) spot.entries.set(li, { layer: li, label: n.label, root: n.root, ids: [] });
     }
     // A note that's in a voicing is drawn as the voicing's.
     for (const n of layer.extras || []) {
@@ -162,8 +167,8 @@ export function notesMarkup(geo, layers, { radius }) {
 // Labels grow with the dot, longer ones less: [share of the radius, largest size in px].
 const LABEL_FIT = { 1: [1.15, 13], 2: [1, 12], 3: [0.85, 10.5] };
 
-// The root is a rounded square, the other tones circles, so it stands out without color. Extra
-// notes (`ghost`) belong to no voicing, so they have no `data-v` and the mouse passes them by.
+// The root is a rounded square, the other tones circles, so it stands out without color. A dot in
+// no voicing (Chord tones, or outlined for All notes) has no `data-v`: the mouse passes it by.
 function dotMarkup(cls, entry, x, y, r) {
   const mark = entry.root
     ? `<rect class="mark" x="${r1(-r)}" y="${r1(-r)}" width="${r1(2 * r)}" height="${r1(2 * r)}" rx="${r1(r * 0.38)}"/>`
@@ -171,7 +176,7 @@ function dotMarkup(cls, entry, x, y, r) {
   const [share, largest] = LABEL_FIT[Math.min(entry.label.length, 3)];
   const text = r >= MIN_LABELED_RADIUS ? `<text font-size="${r1(Math.min(r * share, largest))}">${entry.label}</text>` : '';
   const classes = `dot ${cls}${entry.root ? ' root' : ''}${entry.ghost ? ' ghost' : ''}`;
-  const voicings = entry.ghost ? '' : ` data-v="${entry.ids.join(' ')}"`;
+  const voicings = entry.ids.length ? ` data-v="${entry.ids.join(' ')}"` : '';
   return `<g class="${classes}"${voicings} transform="translate(${r1(x)} ${r1(y)})">${mark}${text}</g>`;
 }
 

@@ -7,6 +7,8 @@ import {
   QUALITIES,
   TUNING,
   chordName,
+  chordNotes,
+  chordSymbol,
   chordTones,
   fretText,
   inversionName,
@@ -105,7 +107,7 @@ test('suggests chords for what is being typed', () => {
   const [dm7] = suggestChords('Dm7');
   assert.deepEqual(dm7, { text: 'Dm7', quality: 'm7', desc: 'minor 7th · D–7', approx: false });
   const g9 = suggestChords('G9')[0];
-  assert.equal(g9.desc, 'shown as G7');
+  assert.equal(g9.desc, 'voiced as G7');
   assert.equal(g9.approx, true);
   // Every suggestion reads back as the chord it says.
   for (const token of ['D', 'Dm', 'G7', 'Cmaj', 'Esus', 'A9']) {
@@ -196,6 +198,59 @@ test('finds every note of a chord on the neck', () => {
   assert.deepEqual([...new Set(notes.map((n) => n.string))], [1, 2, 3, 4, 5, 6]);
   assert.ok(notesOnNeck(chord('Cmaj7'), { openStrings: false }).every((n) => n.fret > 0));
   assert.ok(notesOnNeck(chord('Cmaj7'), { frets: 24 }).some((n) => n.fret === 24));
+});
+
+test('reads every note a chord symbol asks for', () => {
+  const notes = (text) => {
+    const all = chordNotes(chord(text));
+    return `${all.map((t) => t.name).join(' ')} / ${all.map((t) => t.label).join(' ')}`;
+  };
+  // Voiced as the nearest chord, named and spelled as written.
+  const g = chord('G7#5b9');
+  assert.equal(chordName(g), 'G7♯5');
+  assert.equal(chordSymbol(g), 'G7♯5♭9');
+  assert.equal(notes('G7#5b9'), 'G B D♯ F A♭ / R 3 ♯5 ♭7 ♭9');
+  assert.equal(notes('G7alt'), 'G B F A♭ A♯ C♯ E♭ / R 3 ♭7 ♭9 ♯9 ♯11 ♭13');
+  assert.equal(notes('Cmaj9'), 'C E G B D / R 3 5 7 9');
+  assert.equal(notes('C13'), 'C E G B♭ D A / R 3 5 ♭7 9 13');
+  assert.equal(notes('Dm11'), 'D F A C E G / R ♭3 5 ♭7 9 11');
+  assert.equal(notes('Dm13'), 'D F A C E G B / R ♭3 5 ♭7 9 11 13');
+  // A dominant 11th without its 3rd, as jazz players read it: C9sus4.
+  assert.equal(notes('C11'), 'C G B♭ D F / R 5 ♭7 9 11');
+  assert.equal(notes('C6/9'), 'C E G A D / R 3 5 6 9');
+  assert.equal(notes('C69'), notes('C6/9'));
+  assert.equal(notes('B♭7♯11'), 'B♭ D F A♭ E / R 3 5 ♭7 ♯11');
+  assert.equal(notes('Bø9'), 'B D F A C♯ / R ♭3 ♭5 ♭7 9');
+  assert.equal(notes('G13b9'), 'G B D F A♭ E / R 3 5 ♭7 ♭9 13');
+  assert.equal(notes('C13sus4'), 'C F G B♭ D A / R 4 5 ♭7 9 13');
+  assert.equal(notes('E7(b9,#11)'), 'E G♯ B D F A♯ / R 3 5 ♭7 ♭9 ♯11');
+  // Triads stay triads, though they're voiced as four-note chords.
+  assert.equal(notes('C'), 'C E G / R 3 5');
+  assert.equal(notes('Cm'), 'C E♭ G / R ♭3 5');
+  assert.equal(notes('C+'), 'C E G♯ / R 3 ♯5');
+  assert.equal(notes('Csus'), 'C F G / R 4 5');
+  assert.equal(notes('Cadd9'), 'C E G D / R 3 5 9');
+  // A slash chord's bass is one of its notes.
+  assert.equal(notes('Dm7/G'), 'D F A C G / R ♭3 5 ♭7 4');
+  assert.equal(notes('C/E'), 'C E G / R 3 5');
+  // A chord voiced as written, or a ready-made one, has its four tones; so does a suffix the app
+  // voices as the nearest but can't read in full.
+  assert.deepEqual(chordNotes(chord('F♯ø')), chordTones(chord('F♯ø')));
+  const [ii] = presetChords('ii-V-I', 'C');
+  assert.deepEqual(chordNotes(ii), chordTones(ii));
+  assert.equal(notes('Cm7?'), 'C E♭ G B♭ / R ♭3 5 ♭7');
+  // Every note that reads also comes out as one note per pitch.
+  for (const text of ['G7alt', 'C13#11', 'C7#5b13', 'Bb7b5#11']) {
+    const pcs = chordNotes(chord(text)).map((t) => t.pc);
+    assert.equal(new Set(pcs).size, pcs.length, `${text} has each note once`);
+  }
+  // Written with proper signs.
+  assert.equal(chordSymbol(chord('bb-9')), 'B♭–9');
+  assert.equal(chordSymbol(chord('C^9')), 'CΔ9');
+  assert.equal(chordSymbol(chord('Bb7/Ab')), 'B♭7/A♭');
+  assert.equal(chordSymbol(chord('Dm7')), 'Dm7');
+  // All notes and Chord tones find every one of them on the neck: ♭9 of G7♯5♭9 is A♭.
+  assert.ok(notesOnNeck(chord('G7#5b9')).some((n) => n.string === 1 && n.fret === 4 && n.tone.label === '♭9'));
 });
 
 test('stays within the frets shown', () => {

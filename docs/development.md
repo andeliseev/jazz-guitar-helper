@@ -200,6 +200,7 @@ Before a release, on Windows and macOS:
 - Click I–vi–ii–V under Presets: it replaces the progression; Undo brings it back. Its + adds it to the end.
 - Save, a name, Enter: it's under My presets. Clear, click it: it's back. Save it again under the same name: replaced, with Undo. Delete, then Undo.
 - Drop 3 and Drop 2&4 show their own string sets; double-click a set or an inversion shows only it.
+- Add `G7#5b9`: the sidebar says G7♯5♭9, voiced as G7♯5, G B D♯ F A♭; All notes outlines its ♭9s. Chord tones (or `4`): every note of each chord on the neck, Strings, Inversions, Voice leading and All notes dimmed in place, the toolbar no taller. `1` brings the voicings back with their pins.
 - Point at a dot and at a line: the voicings light up, the fret is shaded on every board, the heading shows inversion and frets. Click: pinned, frets under the chord in the sidebar.
 - Voice leading on, click a Dm7 voicing: G7 and Cmaj7 follow on the same strings. Add a chord: it follows too. `Esc` clears.
 - Overlay: one board, chords side by side where they share a spot, the path under the board.
