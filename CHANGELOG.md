@@ -4,6 +4,8 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+## 0.1.1 (2026-11-17)
+
 - Suggestions as you type a chord: the chords that fit, with their names and usual short forms, and what you'll see for chords like Dm9 or G13. Choose one with the arrow keys and Enter or a click, or press Tab to keep typing.
 - Quick add is now Presets, and a preset takes the place of your progression instead of adding to the end, with Undo. Point at one and click + to add it to the end.
 - Save your own progressions under My presets: click one to bring it back, + to add it to the end, or delete it.
