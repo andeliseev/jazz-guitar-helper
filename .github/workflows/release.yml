@@ -160,6 +160,11 @@ jobs:
         # The platforms chosen in the Prepare job.
         include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
+    # bash on every runner: Windows runs steps in PowerShell by default, where "$VERSION" is an
+    # unset PowerShell variable, not the environment variable, and the version came out empty.
+    defaults:
+      run:
+        shell: bash
     steps:
       # Every action is pinned to a commit, with its tag or branch in a comment, as in Unified Mail:
       # this job holds the update-signing key, so a tag moved to other code mustn't change what runs
