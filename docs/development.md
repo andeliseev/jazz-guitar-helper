@@ -55,6 +55,8 @@ cd src-tauri && cargo test
 
 Every rule in `theory.js` has a test. When a voicing looks wrong, add the shape players know as a test first (`x x 0 2 1 1` is Dm7 Drop 2), then fix it.
 
+`npm test` names the test file (`node --test tests/theory.test.mjs`); add a new test file to it. A pattern like `tests/*.test.mjs` works only from Node 21, and the Release workflow runs the tests on Node 20, where it fails with "Could not find".
+
 ## Trying the page in a browser
 
 The page runs without Tauri: with no `window.__TAURI__`, `app.js` keeps its state in `localStorage` and Settings → Appearance only changes the page. To try layout and behavior in any browser:
