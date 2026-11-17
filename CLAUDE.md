@@ -5,7 +5,7 @@
 ## Commands
 
 - `npm run dev`: run the app with hot reload, as the separate test app "Jazz Guitar Helper (test)"
-- `npm test`: the music theory tests (`src/theory.js`); `cd src-tauri && cargo test`: the Rust tests
+- `npm test`: the music theory tests (`src/theory.js`) and the release version rule's (`scripts/next-version.mjs`); `cd src-tauri && cargo test`: the Rust tests. It lists its test files by name (the Release workflow's Node 20 doesn't expand `*`): add new ones there
 - `npm run serve`: the page alone at http://localhost:5178, in any browser, keeping its state in localStorage
 - `npx tauri build --no-bundle`: release exe only, for size checks
 - `node scripts/screenshots.mjs`: render the README screenshots from `src/` (after a visible UI change)

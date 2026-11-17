@@ -3,7 +3,7 @@
 ## Not verified yet
 
 - The macOS build: the title bar (window buttons centered on the toolbar's first row, the brand under them, full screen), WKWebView rendering of the SVG boards, and the `.dmg` from the Release workflow. Everything so far was checked on Windows 11 (WebView2) and in Chromium.
-- The Release workflow hasn't run yet. The first release needs the exact version `0.1.0` and the updater's two secrets (see [development.md](development.md#releases-github-actions)).
+- The Release workflow hasn't run to the end yet (see [development.md](development.md#releases-github-actions)).
 - Updates end to end: no release has been updated from yet. The first real test is 0.1.0 updating to the next version, on Windows and macOS (the relaunch after a Mac update is Unified Mail's, which works there). The Mac app is only ad-hoc signed, while Unified Mail updates itself with its own certificate. If macOS asks anything when this app updates itself, sign it with that certificate the way Unified Mail's workflow does (its `APPLE_CERTIFICATE` and `APPLE_CERTIFICATE_PASSWORD` secrets, rcodesign, `signingIdentity` in `tauri.release.conf.json`).
 - Windows 10: the window buttons' glyphs fall back to Segoe MDL2 Assets there.
 

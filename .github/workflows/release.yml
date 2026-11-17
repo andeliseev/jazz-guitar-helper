@@ -1,8 +1,9 @@
 # One-click release: Actions → Release → Run workflow.
-# Builds the Windows and/or macOS installers and publishes them as a GitHub Release, with the
-# signed update files installed apps update from. Needs the updater's TAURI_SIGNING_PRIVATE_KEY and
-# TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets, the same key as Unified Mail's
-# (see docs/development.md#updates). The app isn't code-signed yet.
+# Builds the Windows and/or macOS installers, with the signed update files installed apps update
+# from, and publishes them as a GitHub Release. Nothing is committed until every installer is
+# built, so a failed run leaves main as it was (as in TorrStream Lite). Needs the updater's
+# TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets, the same key
+# as Unified Mail's (see docs/development.md#updates). The app isn't code-signed yet.
 name: Release
 run-name: Release (${{ inputs.version || inputs.bump }}, ${{ inputs.platforms }})
 
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Raise the last released version: patch for fixes (1.2.3 → 1.2.4), minor for new features (→ 1.3.0), major (→ 2.0.0)"
+        description: "Raise the last released version: patch for fixes (1.2.3 → 1.2.4), minor for new features (→ 1.3.0), major (→ 2.0.0). The first release is package.json's version."
         type: choice
         options: [patch, minor, major]
         default: patch
@@ -32,14 +33,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Runs the tests, works out the version and creates a draft release. Nothing is committed until
+  # Publish, so a failed build leaves main as it was.
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      sha: ${{ steps.commit.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
       release_id: ${{ steps.release.outputs.id }}
       matrix: ${{ steps.platforms.outputs.matrix }}
     steps:
+      - name: Check branch
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != refs/heads/main ]; then
+            echo "::error::Run the release from main, not $REF."
+            exit 1
+          fi
+
       - name: Check secrets
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -71,7 +83,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run the theory tests
+      - name: Run the tests
         run: npm test
 
       - name: Set version
@@ -81,52 +93,37 @@ jobs:
           EXACT: ${{ inputs.version }}
         run: |
           next=$(node scripts/next-version.mjs "$BUMP" "$EXACT")
-          echo "$next" >> "$GITHUB_OUTPUT"
           version=$(echo "$next" | sed -n 's/^version=//p')
           last=$(echo "$next" | sed -n 's/^last=//p')
-          # After a failed run package.json may already have this version.
-          if [ "$version" != "$(node -p "require('./package.json').version")" ]; then
-            node scripts/set-version.mjs "$version"
-          fi
-          # CHANGELOG.md's Unreleased notes become this version's; the version commit includes it.
+          # The same changes as Publish commits, here only to check them and read the notes.
+          # After a run that committed but didn't publish, main already has them.
+          node scripts/set-version.mjs "$version"
+          # CHANGELOG.md's Unreleased notes become this version's.
           node scripts/changelog.mjs "$version" > "$RUNNER_TEMP/notes.md"
           if ! grep -q . "$RUNNER_TEMP/notes.md"; then
             echo "::warning::CHANGELOG.md has nothing under Unreleased, so this release has no What's new."
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          echo "Releasing **v$version** (last release: v$last)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Commit version change
-        id: commit
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-          # Whoever started the release authors its commit, through their private
-          # noreply address: it counts as theirs, and no bot joins the contributors.
-          ACTOR: ${{ github.actor }}
-          ACTOR_ID: ${{ github.actor_id }}
-        run: |
-          if ! git diff --quiet; then
-            git config user.name "$ACTOR"
-            git config user.email "$ACTOR_ID+$ACTOR@users.noreply.github.com"
-            git commit -am "Release $TAG"
-            git push
-          fi
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Releasing **v$version** (last release: $last)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create draft release
         id: release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           TAG: ${{ steps.version.outputs.tag }}
-          SHA: ${{ steps.commit.outputs.sha }}
           PLATFORMS: ${{ inputs.platforms }}
           NOTES: ${{ runner.temp }}/notes.md
         with:
           script: |
-            const { TAG: tag, SHA: sha, PLATFORMS: platforms } = process.env;
+            const { TAG: tag, PLATFORMS: platforms } = process.env;
             const notes = require('fs').readFileSync(process.env.NOTES, 'utf8').trim();
-            // A draft left behind by a failed run is replaced.
             const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            if (releases.some((r) => r.tag_name === tag && !r.draft)) {
+              core.setFailed(`${tag} is already published.`);
+              return;
+            }
+            // A draft left behind by a failed run is replaced.
             for (const old of releases.filter((r) => r.draft && r.tag_name === tag)) {
               await github.rest.repos.deleteRelease({ ...context.repo, release_id: old.id });
             }
@@ -143,10 +140,11 @@ jobs:
               ...(windows ? ['- **Windows:** "Windows protected your PC" → **More info** → **Run anyway**'] : []),
               ...(macos ? ['- **macOS:** open the app once, then **System Settings → Privacy & Security → Open Anyway**'] : []),
             ].join('\n');
+            // Publish points it at the release commit.
             const { data } = await github.rest.repos.createRelease({
               ...context.repo,
               tag_name: tag,
-              target_commitish: sha,
+              target_commitish: context.sha,
               name: `Jazz Guitar Helper ${tag}`,
               body,
               draft: true,
@@ -166,9 +164,9 @@ jobs:
       # Every action is pinned to a commit, with its tag or branch in a comment, as in Unified Mail:
       # this job holds the update-signing key, so a tag moved to other code mustn't change what runs
       # here. To update one: gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
+      # The commit the run started on: nothing has been committed since.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
           # Nothing in this job pushes, so the write token isn't left in .git/config for the build to read.
           persist-credentials: false
 
@@ -189,6 +187,12 @@ jobs:
 
       - run: npm ci
 
+      # The files as the release commit will have them; Publish commits them.
+      - name: Set version
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: node scripts/set-version.mjs "$VERSION"
+
       # The Mac app gets an ad-hoc signature (bundle.macOS.signingIdentity "-" in tauri.conf.json),
       # which Apple Silicon needs to run it at all.
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
@@ -208,20 +212,53 @@ jobs:
           # separate .sig files would only clutter the downloads.
           uploadUpdaterSignatures: false
 
-  # Publish only when every installer built, so a release is never half-empty.
+  # Commit and publish only when every installer built, so main never has a release commit without
+  # a release, and a release is never half-empty.
   publish:
     name: Publish
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 20
+
+      - name: Commit version change
+        id: commit
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          # Whoever started the release authors its commit, through their private
+          # noreply address: it counts as theirs, and no bot joins the contributors.
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          node scripts/set-version.mjs "$VERSION"
+          node scripts/changelog.mjs "$VERSION" > /dev/null
+          if ! git diff --quiet; then
+            git config user.name "$ACTOR"
+            git config user.email "$ACTOR_ID+$ACTOR@users.noreply.github.com"
+            git commit -am "Release v$VERSION"
+            # Refused if main moved since the run started: the installers are of the commit before.
+            if ! git push origin HEAD:main; then
+              echo "::error::Couldn't push the release commit to main. If something was pushed there while the release ran, run the release again."
+              exit 1
+            fi
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          SHA: ${{ steps.commit.outputs.sha }}
         with:
           script: |
+            // The tag is created at the release commit.
             const { data } = await github.rest.repos.updateRelease({
               ...context.repo,
               release_id: Number(process.env.RELEASE_ID),
+              target_commitish: process.env.SHA,
               draft: false,
               make_latest: 'true',
             });

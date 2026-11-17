@@ -36,10 +36,11 @@ flowchart LR
 | `src-tauri/src/update.rs` | `check_update` and `install_update`, and on macOS opening the app again after an update (see [development.md](development.md#updates)) |
 | `src-tauri/build.rs` | tauri-build, and a rebuild when `icons/icon.ico` changes |
 | `tests/theory.test.mjs` | Tests for `theory.js`, run by Node (`npm test`) |
+| `tests/release.test.mjs` | Tests for the release version rule in `scripts/next-version.mjs` |
 | `scripts/serve.mjs` | Serves `src/` for trying the page in a browser (see [development.md](development.md#trying-the-page-in-a-browser)) |
 | `scripts/screenshots.mjs` | Renders the README's screenshots in headless Edge or Chrome (see [development.md](development.md#screenshots)) |
 | `scripts/icons.mjs` | Makes `src-tauri/icons/` from `app-icon.svg`, the Windows icon scaled to fill its square (see [development.md](development.md#app-icon)) |
-| `scripts/changelog.mjs`, `next-version.mjs`, `set-version.mjs` | The Release workflow's version and notes, as in Unified Mail (see [development.md](development.md#releases-github-actions)) |
+| `scripts/changelog.mjs`, `next-version.mjs`, `set-version.mjs` | The Release workflow's version and notes, as in Unified Mail, with TorrStream Lite's version rule (see [development.md](development.md#releases-github-actions)) |
 
 ## Commands (UI → Rust)
 

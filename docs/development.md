@@ -41,7 +41,7 @@ The first `npm run build` on Windows downloads the NSIS and WiX installer tools.
 
 ## Tests
 
-The music theory (`src/theory.js`), with Node's own test runner:
+The music theory (`src/theory.js`) and the Release workflow's version rule (`scripts/next-version.mjs`), with Node's own test runner:
 
 ```bash
 npm test
@@ -55,7 +55,7 @@ cd src-tauri && cargo test
 
 Every rule in `theory.js` has a test. When a voicing looks wrong, add the shape players know as a test first (`x x 0 2 1 1` is Dm7 Drop 2), then fix it.
 
-`npm test` names the test file (`node --test tests/theory.test.mjs`); add a new test file to it. A pattern like `tests/*.test.mjs` works only from Node 21, and the Release workflow runs the tests on Node 20, where it fails with "Could not find".
+`npm test` names the test files (`node --test tests/theory.test.mjs tests/release.test.mjs`); add a new test file to it. A pattern like `tests/*.test.mjs` works only from Node 21, and the Release workflow runs the tests on Node 20, where it fails with "Could not find".
 
 ## Trying the page in a browser
 
@@ -81,7 +81,7 @@ The release profile in `Cargo.toml` is tuned for size: `opt-level = "s"`, `lto`,
 
 ## Releases (GitHub Actions)
 
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) builds and publishes a release in one click, as Unified Mail's does, without its Google client and Mac signing steps.
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) builds and publishes a release in one click. It's Unified Mail's, without its Google client and Mac signing steps, and with TorrStream Lite's two fixes: the first release takes `package.json`'s version, and nothing is committed until every installer is built.
 
 **One-time setup:** in the GitHub repo, open **Settings → Secrets and variables → Actions → New repository secret** and add the updater's signing key, the same one Unified Mail uses (see [Updates](#updates)):
 
@@ -100,13 +100,18 @@ The workflow refuses to run without the key, so a release can never go out witho
 | `minor` | 1.3.0 | New features |
 | `major` | 2.0.0 | Big changes |
 
-Or type an exact version. **The first release needs `0.1.0` typed in**: with no release yet, `patch` would give 0.0.1, which is older than `package.json`, and the workflow refuses it.
+Or type an exact version. The version comes from `scripts/next-version.mjs`, by TorrStream Lite's rules:
+
+- The last release is the highest `vX.Y.Z` tag on GitHub. Tags appear only when a release is published.
+- **The first release is `package.json`'s version** (0.1.0), whatever is chosen above, unless an exact version is typed.
+- After that, the last release raised as chosen, but never below `package.json`'s version: a run that pushed its release commit and then failed to publish is simply run again and gets the same version.
+- A version that isn't newer than the last release, or is below `package.json`'s, is refused with a message saying what to enter.
 
 What it does:
 
-1. **Prepare** runs the theory tests, works out the version from the highest `vX.Y.Z` tag (`scripts/next-version.mjs`), writes it into `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock` (`scripts/set-version.mjs`), moves CHANGELOG.md's **Unreleased** lines under the version (`scripts/changelog.mjs`), commits and pushes that as "Release vX.Y.Z", and creates a draft release with those lines as What's new.
-2. **Build** makes the Windows installers (NSIS `.exe` and `.msi`) and one universal macOS `.dmg` for Apple Silicon and Intel, with their signed update files and `latest.json`, and uploads them to the draft.
-3. **Publish** publishes the release once every installer is there, so a release is never half-empty. A failed run leaves the draft; run it again with the same version.
+1. **Prepare** checks that it runs from `main` and that the signing key is there, runs the tests, works out the version, and creates a draft release with CHANGELOG.md's **Unreleased** lines as What's new (`scripts/changelog.mjs`). It commits nothing; a draft left by an earlier failed run of the same version is replaced, and a version already published is refused.
+2. **Build** writes the version into `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock` in its own checkout (`scripts/set-version.mjs`), as the release commit will have them, makes the Windows installers (NSIS `.exe` and `.msi`) and one universal macOS `.dmg` for Apple Silicon and Intel, with their signed update files and `latest.json`, and uploads them to the draft.
+3. **Publish**, only once every installer is there, commits the version and the changelog as "Release vX.Y.Z", authored by whoever started the release, pushes it to `main`, and publishes the release with its tag on that commit. So a failed run leaves `main` as it was and no half-empty release; run it again. If something was pushed to `main` while it ran, the push is refused: run the release again, so the installers are of the newest code.
 
 The Mac app gets an ad-hoc signature (`"signingIdentity": "-"`), which Apple Silicon needs to run it. It isn't notarized, so macOS asks once at first launch (README → First launch). Unified Mail signs with its own certificate so the keychain keeps trusting it across updates; this app uses no keychain, so it doesn't need that.
 
