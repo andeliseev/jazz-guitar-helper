@@ -155,6 +155,10 @@ function defaultUi() {
     // The click's sound (CLICKS) and how loud it is, 0–100.
     click: 'tick',
     clickVolume: 70,
+    // Its rhythm (GROOVES): every beat, 2 and 4, or the ride's swing; and for swing, where the
+    // swung eighth falls, as a share of the beat (50 straight, 67 a triplet, 75 dotted).
+    groove: 'every',
+    swing: 67,
     // The chords' sound while playing (SOUNDS): off, plucked, or a pad held for a bar at a time;
     // how much reverb (`space`) and how loud (`volume`), 0–100; and the root an octave lower
     // (`bass`).
@@ -222,6 +226,8 @@ function sanitize(saved) {
   for (const key of ['countIn', 'follow', 'bass']) if (typeof saved[key] === 'boolean') ui[key] = saved[key];
   // `click` was on or off before it had sounds: on was the tick.
   if (CLICKS[saved.click]) ui.click = saved.click;
+  if (GROOVES[saved.groove]) ui.groove = saved.groove;
+  if (Number.isInteger(saved.swing) && saved.swing >= SWING_RANGE[0] && saved.swing <= SWING_RANGE[1]) ui.swing = saved.swing;
   else if (saved.click === false) ui.click = 'off';
   // `sound` was on or off before there were pads: off stays off, on was the pluck.
   if (SOUNDS[saved.sound]) ui.sound = saved.sound;
@@ -917,14 +923,25 @@ const SOUNDS = {
 const player = { ctx: null, mix: null, buffers: new Map(), noise: null, voices: [], playing: false, timer: 0, next: 0, beat: 0, shown: null };
 
 // The click's sounds: Tick (a short triangle), Wood (a woodblock: two sines and a knock of noise),
-// Hi-hat (noise above 7 kHz), Beep (a sine). The first beat of a bar is higher, or longer.
+// Hi-hat (noise above 7 kHz), Beep (a sine), Ride (a cymbal: metallic partials, ringing). A
+// stronger beat is higher, or longer, or louder.
 const CLICKS = {
   off: { name: 'Off' },
   tick: { name: 'Tick' },
   wood: { name: 'Wood' },
   hihat: { name: 'Hi-hat' },
   beep: { name: 'Beep' },
+  ride: { name: 'Ride' },
 };
+
+// The click's rhythms: every beat with 1 stronger; only 2 and 4, as a drummer's hi-hat; or swing,
+// the ride's "ding, ding-a, ding, ding-a", 2 and 4 stronger, with the swung eighth before them.
+const GROOVES = {
+  every: { name: 'Every beat' },
+  backbeat: { name: '2 & 4' },
+  swing: { name: 'Swing' },
+};
+const SWING_RANGE = [50, 75];
 
 const clock = () => (player.ctx ? player.ctx.currentTime : performance.now() / 1000);
 
@@ -1003,7 +1020,7 @@ function schedule() {
     const time = player.next;
     const span = beat >= 0 ? spans.find((s) => beat < s.start + s.beats) : null;
     if (player.ctx) {
-      tick(time, mod(beat, 4) === 0);
+      clickBeat(beat, time, 60 / state.ui.bpm);
       if (span && (beat === span.start || mod(beat, 4) === 0)) {
         const until = Math.min(span.start + span.beats, (Math.floor(beat / 4) + 1) * 4);
         chordSound(span.chord, time, ((until - beat) * 60) / state.ui.bpm);
@@ -1127,8 +1144,26 @@ function setMix(mix = player.mix) {
   mix.click.gain.value = state.ui.clickVolume / 100;
 }
 
-/** The metronome's click in its sound (CLICKS), higher on the first beat of a bar. */
-function tick(time, accent) {
+/**
+ * A beat's click in the chosen rhythm (GROOVES), at `time`, a beat lasting `beat` seconds. The
+ * count-in is every beat whatever the rhythm, so "one" is heard before 2 and 4 take over.
+ */
+function clickBeat(index, time, beat) {
+  const { groove, swing } = state.ui;
+  const inBar = mod(index, 4);
+  if (index < 0 || groove === 'every') return tick(time, inBar === 0);
+  const two = inBar === 1 || inBar === 3;
+  if (groove === 'backbeat') {
+    if (two) tick(time, false);
+    return;
+  }
+  // Swing: every beat, 2 and 4 stronger; on 1 and 3, also the softer swung eighth leading to them.
+  tick(time, two);
+  if (!two) tick(time + (swing / 100) * beat, false, 0.6);
+}
+
+/** The metronome's click in its sound (CLICKS), stronger with `accent`, at `level` of its loudness. */
+function tick(time, accent, level = 1) {
   const ctx = player.ctx;
   const kind = state.ui.click;
   if (kind === 'off') return;
@@ -1136,7 +1171,7 @@ function tick(time, accent) {
   const envelope = (peak, length) => {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(peak, time + 0.002);
+    gain.gain.exponentialRampToValueAtTime(peak * level, time + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + length);
     gain.connect(player.mix.click);
     return gain;
@@ -1168,6 +1203,27 @@ function tick(time, accent) {
     noise('bandpass', 2600, 4, 0.25, 0.012);
   } else if (kind === 'hihat') {
     noise('highpass', 7000, 0.7, accent ? 0.5 : 0.3, accent ? 0.09 : 0.045);
+  } else if (kind === 'ride') {
+    // Six square waves at clashing pitches, as drum machines make cymbals, kept to the highs and
+    // left to ring; a sine adds the bell's ping.
+    const out = envelope(accent ? 0.24 : 0.16, accent ? 1.1 : 0.8);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 8500;
+    band.Q.value = 0.7;
+    const high = ctx.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 5500;
+    band.connect(high).connect(out);
+    for (const freq of [205.3, 304.4, 369.6, 522.7, 540, 800]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      osc.connect(band);
+      osc.start(time);
+      osc.stop(time + 1.2);
+    }
+    tone('sine', 2640, accent ? 0.05 : 0.03, 0.5);
   } else {
     tone('sine', accent ? 1320 : 880, accent ? 0.45 : 0.3, 0.09);
   }
@@ -2023,7 +2079,7 @@ function bindEvents() {
   document.addEventListener('pointerdown', (e) => {
     if (!e.target.closest('.sound-pick')) showCard(null);
   });
-  for (const [list, key] of [['#sounds', 'sound'], ['#clicks', 'click']]) {
+  for (const [list, key] of [['#sounds', 'sound'], ['#clicks', 'click'], ['#grooves', 'groove']]) {
     $(list).addEventListener('click', (e) => {
       const b = e.target.closest('button[data-choice]');
       if (!b) return;
@@ -2039,6 +2095,12 @@ function bindEvents() {
       scheduleSave();
     });
   }
+  // The swing feel applies from the next beat; its ratio shows as it moves.
+  $('#swing').addEventListener('input', (e) => {
+    state.ui.swing = Number(e.target.value);
+    renderSound();
+    scheduleSave();
+  });
   $('#bass').addEventListener('change', (e) => {
     state.ui.bass = e.target.checked;
     scheduleSave();
@@ -2159,6 +2221,12 @@ function renderSound() {
   $('#click-button').setAttribute('aria-pressed', String(ui.click !== 'off'));
   for (const b of $$('#clicks button')) b.setAttribute('aria-checked', String(b.dataset.choice === ui.click));
   $('#click-volume').value = ui.clickVolume;
+  for (const b of $$('#grooves button')) b.setAttribute('aria-checked', String(b.dataset.choice === ui.groove));
+  // The swing's slider, only with Swing, saying the long eighth against the short: 2:1 a triplet.
+  $('#swing-row').hidden = ui.groove !== 'swing';
+  $('#swing').value = ui.swing;
+  $('#swing-ratio').textContent = `${Math.round((ui.swing / (100 - ui.swing)) * 10) / 10}:1`;
+  if (ui.groove !== 'every') $('#click-name').textContent += ` · ${GROOVES[ui.groove].name}`;
 }
 
 /** Opens one sound card (`#sound-card` or `#click-card`), or closes them all with null. */
@@ -2183,6 +2251,7 @@ function fillControls() {
     );
   choices('#sounds', SOUNDS);
   choices('#clicks', CLICKS);
+  choices('#grooves', GROOVES);
   $('#key').replaceChildren(
     ...KEYS.map((k) => {
       const option = el('option', null, k);

@@ -572,7 +572,9 @@ select { padding: 3px 6px; cursor: pointer; }
 .sound-list button { padding: 3px 10px; border-radius: 999px; font-size: 12.5px; }
 .sound-list button[aria-checked="true"] { background: var(--selected); color: var(--accent); }
 .sound-row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
-.sound-row span { width: 56px; }
+.sound-row span { flex: none; width: 56px; }
+.sound-row[hidden] { display: none; }
+.sound-row output { width: 32px; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
 .sound-row input { flex: 1; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .sound-card .setting-row { padding: 2px 0 4px; font-size: 13px; }
 /* As wide when it says nothing as when it names a chord, so the bar doesn't move as it plays. */

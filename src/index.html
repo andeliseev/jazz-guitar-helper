@@ -166,6 +166,13 @@
           <div id="click-card" class="sound-card" role="dialog" aria-label="Click" hidden>
             <span class="group-label">Click</span>
             <div id="clicks" class="sound-list" role="radiogroup" aria-label="Click sound"></div>
+            <div class="sound-row">
+              <span>Rhythm</span>
+              <div id="grooves" class="sound-list" role="radiogroup" aria-label="Click rhythm"></div>
+            </div>
+            <label id="swing-row" class="sound-row" title="Where the swung eighth falls: halfway is straight, 2:1 a triplet, 3:1 dotted">
+              <span>Swing</span><input id="swing" type="range" min="50" max="75" step="1"><output id="swing-ratio" for="swing">2:1</output>
+            </label>
             <label class="sound-row" title="The click against the chords">
               <span>Volume</span><input id="click-volume" type="range" min="0" max="100" step="1">
             </label>
