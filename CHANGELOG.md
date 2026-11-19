@@ -4,6 +4,8 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+## 0.2.2 (2026-11-19)
+
 - The click can swing: besides every beat, it plays only 2 and 4, or a ride cymbal's swing pattern with the feel you set, from straight to triplet to dotted. A Ride sound joins its sounds.
 
 ## 0.2.1 (2026-11-17)

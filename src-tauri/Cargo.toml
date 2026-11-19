@@ -1,6 +1,6 @@
 [package]
 name = "jazz-guitar-helper"
-version = "0.2.1"
+version = "0.2.2"
 description = "Drop voicings on the guitar fretboard"
 license = "MIT"
 repository = "https://github.com/andeliseev/jazz-guitar-helper"
