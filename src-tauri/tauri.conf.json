@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Jazz Guitar Helper",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "com.andeliseev.jazz-guitar-helper",
   "build": {
     "frontendDist": "../src"
