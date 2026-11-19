@@ -43,6 +43,8 @@ const FRET_CHOICES = [12, 15, 17, 20, 22, 24];
 const GAPS = { stacked: 20, overlay: 32 };
 const GAP_RANGE = [16, 44];
 const BPM_RANGE = [40, 240];
+// A row of fret numbers over or under the boards: none, the frets with inlays, or every fret.
+const NUMBER_ROWS = ['off', 'inlays', 'all'];
 const MAX_DOT_RADIUS = 14;
 const SAVE_DELAY_MS = 300;
 const TOAST_MS = 6000;
@@ -174,6 +176,9 @@ function defaultUi() {
     frets: 15,
     leftHanded: false,
     openStrings: true,
+    // Fret numbers over and under each board (NUMBER_ROWS): the inlay frets' over, every fret's under.
+    numbersAbove: 'inlays',
+    numbersBelow: 'all',
   };
 }
 
@@ -241,6 +246,7 @@ function sanitize(saved) {
   if (FRET_CHOICES.includes(saved.frets)) ui.frets = saved.frets;
   ui.leftHanded = !!saved.leftHanded;
   ui.openStrings = saved.openStrings !== false;
+  for (const key of ['numbersAbove', 'numbersBelow']) if (NUMBER_ROWS.includes(saved[key])) ui[key] = saved[key];
   return ui;
 }
 
@@ -599,7 +605,7 @@ function renderBoards() {
   const rows = follow ? followedRows() : state.rows;
   const draw = (gap) => {
     // Every board has its fret numbers under it, so a fret reads at any board without looking away.
-    const geo = geometry(width, ui.frets, { gap, leftHanded: ui.leftHanded, numbers: true });
+    const geo = geometry(width, ui.frets, { gap, leftHanded: ui.leftHanded, above: ui.numbersAbove, below: ui.numbersBelow });
     state.geo = geo;
     if (ui.view === 'overlay') boards.replaceChildren(overlayView(geo, rows));
     else boards.replaceChildren(...rows.map((row) => stackedRow(row, geo)));
@@ -625,7 +631,8 @@ function fittedGap() {
   const content = Math.max(...[...boards.children].map((n) => n.offsetTop + n.offsetHeight)) + parseFloat(getComputedStyle(boards).paddingBottom);
   const around = content - drawn;
   let gap = GAP_RANGE[1];
-  while (gap > GAP_RANGE[0] && around + svgs.length * boardHeight(gap, true) > boards.clientHeight) gap -= 1;
+  const { numbersAbove, numbersBelow } = state.ui;
+  while (gap > GAP_RANGE[0] && around + svgs.length * boardHeight(gap, numbersAbove, numbersBelow) > boards.clientHeight) gap -= 1;
   return gap;
 }
 
@@ -698,12 +705,13 @@ function showing(what) {
   return `${what}: ${state.ui.mode === 'tones' ? 'chord tones' : `${DROPS[state.ui.drop].name} voicings`}`;
 }
 
-function board(geo, layers, label) {
+/** A board for `layers`; `focus` is the layer of the chord playing, kept in the middle of its frets. */
+function board(geo, layers, label, focus = -1) {
   const svg = svgNode(geo.width, geo.height);
   svg.setAttribute('class', 'board');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', label);
-  svg.innerHTML = boardMarkup(geo) + notesMarkup(geo, layers, { radius: Math.min(geo.gap * 0.46, MAX_DOT_RADIUS) });
+  svg.innerHTML = boardMarkup(geo) + notesMarkup(geo, layers, { radius: Math.min(geo.gap * 0.46, MAX_DOT_RADIUS), focus });
   return svg;
 }
 
@@ -737,7 +745,11 @@ function overlayView(geo, rows) {
     item.append(el('span', 'frets'));
     legend.append(item);
   }
-  section.append(legend, board(geo, rows.map(layerOf), showing(rows.length < state.rows.length ? 'The chord playing and the next' : 'All chords')), el('div', 'overlay-info'));
+  // While playing, the chord playing keeps a straight column: its dots in the middle of each fret.
+  const playing = player.playing && player.shown ? player.shown.chordId : null;
+  const focus = rows.findIndex((row) => row.chord.id === playing);
+  const label = showing(rows.length < state.rows.length ? 'The chord playing and the next' : 'All chords');
+  section.append(legend, board(geo, rows.map(layerOf), label, focus), el('div', 'overlay-info'));
   return section;
 }
 
@@ -1000,8 +1012,8 @@ function stopPlaying() {
   fadeVoices();
   player.shown = null;
   renderPlayer();
-  // Every board again, as tall as the slider says.
-  if (followed) renderBoards();
+  // Every board again, as tall as the slider says, and Overlay's chords side by side again.
+  if (followed || state.ui.view === 'overlay') renderBoards();
   markPlaying();
 }
 
@@ -1039,7 +1051,8 @@ function showBeat(beat, span) {
   const before = player.shown?.chordId;
   player.shown = { beat, chordId: span ? span.chord.id : null, index: span ? span.index : -1, frac: span ? (beat - span.start + 0.5) / span.beats : 0 };
   // Following, a new chord brings new boards: it and the one after it.
-  if (span && span.chord.id !== before && following()) renderBoards();
+  // A new chord draws the boards again when they depend on it: Follow's pair, or Overlay's middle.
+  if (span && span.chord.id !== before && (following() || state.ui.view === 'overlay')) renderBoards();
   markPlaying();
   // A new chord comes into view, on its board and on the staff.
   if (span && span.chord.id !== before) {
@@ -1793,6 +1806,9 @@ function renderSettings() {
   for (const b of $$('#theme button')) b.setAttribute('aria-checked', String(b.dataset.theme === state.theme));
   $('#left-handed').checked = state.ui.leftHanded;
   $('#open-strings').checked = state.ui.openStrings;
+  for (const [id, key] of [['#numbers-above', 'numbersAbove'], ['#numbers-below', 'numbersBelow']]) {
+    for (const b of $$(`${id} button`)) b.setAttribute('aria-checked', String(b.dataset.numbers === state.ui[key]));
+  }
 }
 
 /** Rust sets the window's theme (and so `prefers-color-scheme`) and saves it; the page follows at once. */
@@ -2203,6 +2219,15 @@ function bindEvents() {
     state.ui.openStrings = e.target.checked;
     render();
   });
+  for (const [id, key] of [['#numbers-above', 'numbersAbove'], ['#numbers-below', 'numbersBelow']]) {
+    $(id).addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-numbers]');
+      if (!b) return;
+      state.ui[key] = b.dataset.numbers;
+      renderSettings();
+      render();
+    });
+  }
 
   $('#toast-action').addEventListener('click', runToastAction);
   $('#update').addEventListener('click', installUpdate);

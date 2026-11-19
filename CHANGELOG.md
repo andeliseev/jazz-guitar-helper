@@ -4,6 +4,10 @@ What changed in each version of Jazz Guitar Helper. The newest is at the top; ea
 
 ## Unreleased
 
+- While playing in Overlay, the chord playing keeps the middle of each fret, so its notes line up; another chord's note on the same spot steps aside, smaller.
+- The frets with inlays (3, 5, 7, 9, 12…) are a shade darker, with their numbers over each fretboard too, so a note's fret is easier to tell from any string.
+- Settings choose the fret numbers over and under the fretboards: none, the inlay frets', or every fret's.
+
 ## 0.2.2 (2026-11-19)
 
 - The click can swing: besides every beat, it plays only 2 and 4, or a ride cymbal's swing pattern with the feel you set, from straight to triplet to dotted. A Ride sound joins its sounds.

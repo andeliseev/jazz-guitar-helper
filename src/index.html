@@ -244,6 +244,23 @@
           <span>Open strings <small class="muted">Voicings that use them, near the nut</small></span>
           <input id="open-strings" type="checkbox">
         </label>
+        <!-- Fret numbers over and under each fretboard: none, the frets with inlays, or every fret. -->
+        <div class="setting-row">
+          <span>Numbers over <small class="muted">Fret numbers above each fretboard</small></span>
+          <div id="numbers-above" class="segmented small" role="radiogroup" aria-label="Fret numbers above each fretboard">
+            <button role="radio" data-numbers="off">Off</button>
+            <button role="radio" data-numbers="inlays">Inlays</button>
+            <button role="radio" data-numbers="all">All</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span>Numbers under <small class="muted">Fret numbers below each fretboard</small></span>
+          <div id="numbers-below" class="segmented small" role="radiogroup" aria-label="Fret numbers below each fretboard">
+            <button role="radio" data-numbers="off">Off</button>
+            <button role="radio" data-numbers="inlays">Inlays</button>
+            <button role="radio" data-numbers="all">All</button>
+          </div>
+        </div>
       </section>
 
       <!-- The links open in the browser (open_external). -->

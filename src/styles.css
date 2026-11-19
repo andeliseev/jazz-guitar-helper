@@ -22,6 +22,7 @@
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   /* The fretboard: light maple. */
   --board: #f7f1e6;
+  --board-marked: #f1e9da;
   --fret: #cbbfac;
   --nut: #8a7f6c;
   --string: #9a9184;
@@ -59,6 +60,7 @@
     --toast-bg: #2b2f36;
     /* Dark rosewood. */
     --board: #26221d;
+    --board-marked: #1a1713;
     --fret: #4d463c;
     --nut: #b9b0a0;
     --string: #7d766b;
@@ -94,6 +96,7 @@
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   --toast-bg: #2b2f36;
   --board: #26221d;
+  --board-marked: #1a1713;
   --fret: #4d463c;
   --nut: #b9b0a0;
   --string: #7d766b;
@@ -462,6 +465,8 @@ select { padding: 3px 6px; cursor: pointer; }
 
 .board { display: block; overflow: visible; }
 .board .wood { fill: var(--board); }
+/* The frets with inlays, a shade darker: a landmark from any string (boardMarkup). */
+.board .marked-fret { fill: var(--board-marked); }
 .board .band { fill: var(--band); }
 .board .fret { stroke: var(--fret); stroke-width: 1.6; }
 .board .nut { fill: var(--nut); }

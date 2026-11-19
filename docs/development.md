@@ -206,7 +206,8 @@ Before a release, on Windows and macOS:
 - Play (or Space): a bar of clicks, then each chord sounds as it starts, and again at each bar (Cmaj7's two bars: twice); its row, board and bar are marked, the others rest. Round and round. The tempo changes at once, from the slider or typed (300 becomes 240 on leaving the field).
 - The click button (Tick): Off, Tick, Wood, Hi-hat, Beep and Ride, and its volume. Rhythm 2 & 4: only beats 2 and 4 click, after an every-beat count-in. Swing with Ride: "ding, ding-a", 2 and 4 stronger; the Swing slider goes from 1:1 (straight) through 2:1 (triplet) to 3:1, and the button says "Ride · Swing". The sound button (Ambient): Off, Pluck, Ambient, Warm pad, Strings and Organ; a pad holds each bar and melts into the next; Space and Volume change while it plays; Bass adds the root under it. One card at a time; a click elsewhere or `Esc` closes it; Stop fades the pad.
 - Keys `1` to `4`: Chord tones, Drop 2, Drop 3, Drop 2&4, as the buttons go. A new progression starts in Chord tones.
-- Narrow the window: Frets, Height and Fit move to the next line together. Overlay has its fret numbers under its board, and no board has numbers above it.
+- Narrow the window: Frets, Height and Fit move to the next line together. Every board, Overlay's too, has all its fret numbers under it and the inlay frets' (3, 5, 7, 9, 12, 15) over it, above those frets' darker columns, quiet in both themes.
+- Overlay, Play: the chord playing's notes stand in the middle of each fret, in straight columns; another chord's note on the same spot sits beside it, smaller. Stop: side by side again.
 - Fit with ii–V–I: three boards fill the pane; with a dozen chords they're as small as they get and scroll. Play with Follow: the chord playing and the next one, filling the window; Stop brings them all back.
 - Right-click on a board or the sidebar: no menu. In Add chords: Cut, Copy, Paste.
 - Point at a dot and at a line: the voicings light up, the fret is shaded on every board, the heading shows inversion and frets. Click: pinned, frets under the chord in the sidebar.
@@ -215,6 +216,6 @@ Before a release, on Windows and macOS:
 - All notes: outlined dots for every other note of each chord on all six strings; they don't react to the mouse. Height: the boards follow the slider; Stacked and Overlay keep their own; double-click resets.
 - Settings: each link opens in the browser.
 - Remove a chord and Clear, then Undo (button and `Z`).
-- Settings: Light / Dark / System change the window and the page; left-handed and open strings off redraw the boards. Frets 24, next to Height, does too.
+- Settings: Light / Dark / System change the window and the page; left-handed and open strings off redraw the boards. Frets 24, next to Height, does too. Numbers over and under, each Off, Inlays or All: the boards gain or lose the row, and keep it after a restart.
 - Quit and start again: progression (with lengths and scales), My presets, choices, pins, tempo and appearance are kept.
 - Windows: drag the window by the toolbar and the brand, double-click to maximize, the three buttons work and dim when the window is in the background. macOS: the window buttons sit on the toolbar's first row; in full screen the brand moves up.
